@@ -6,6 +6,9 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+# =====================================================
+# CONFIGURACIÓN GENERAL
+# =====================================================
 st.set_page_config(
     page_title="Panel Mantenimiento Válvulas L2",
     page_icon="🔧",
@@ -19,7 +22,11 @@ TURNOS = ["A", "B", "C"]
 NUMEROS_VALVULA = list(range(1, 113))
 REPUESTOS = ["BLOQUE", "O-RINGS", "RESORTE", "ON/OFF", "OTRO"]
 
-@st.cache_resource
+# =====================================================
+# CONEXIÓN GOOGLE SHEETS
+# ttl=1 para refrescar la conexión casi siempre
+# =====================================================
+@st.cache_resource(ttl=1)
 def conectar():
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -37,11 +44,19 @@ def conectar():
 
 def init_sheet(ws):
     headers = [
-        "Fecha", "Turno", "Operador", "Número Válvula",
-        "Repuesto", "Observaciones", "Fecha registro"
+        "Fecha",
+        "Turno",
+        "Operador",
+        "Número Válvula",
+        "Repuesto",
+        "Observaciones",
+        "Fecha registro"
     ]
 
-    if ws.row_values(1) != headers:
+    try:
+        if ws.row_values(1) != headers:
+            ws.update("A1:G1", [headers])
+    except Exception:
         ws.update("A1:G1", [headers])
 
 
@@ -52,9 +67,18 @@ def obtener_hora_chile():
 def guardar_registros(filas):
     ws = conectar()
     init_sheet(ws)
+
+    # Diagnóstico visible en Streamlit Cloud
+    st.info(f"Intentando guardar {len(filas)} fila(s) en Google Sheets...")
+
     ws.append_rows(filas, value_input_option="USER_ENTERED")
 
+    st.success("Ejecución de guardado completada.")
 
+
+# =====================================================
+# ESTADO DE CHECKBOXES
+# =====================================================
 for numero in NUMEROS_VALVULA:
     key = f"chk_valvula_{numero}"
     if key not in st.session_state:
@@ -78,6 +102,9 @@ def obtener_valvulas_seleccionadas():
     ]
 
 
+# =====================================================
+# ESTILO COMPACTO
+# =====================================================
 st.markdown(
     """
     <style>
@@ -111,6 +138,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# =====================================================
+# ENCABEZADO
+# =====================================================
 st.markdown(
     """
     <div style='text-align:center; padding: 4px 0 8px 0;'>
@@ -122,6 +152,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# =====================================================
+# PANEL DE DATOS GENERALES
+# =====================================================
 with st.container(border=True):
     st.subheader("📝 Datos generales")
 
@@ -148,6 +181,9 @@ with st.container(border=True):
         height=70
     )
 
+# =====================================================
+# PANEL DE SELECCIÓN DE VÁLVULAS COMPACTO
+# =====================================================
 with st.container(border=True):
     st.subheader("🔘 Selección de válvulas")
 
@@ -187,6 +223,9 @@ with st.container(border=True):
                     key=f"chk_valvula_{numero}"
                 )
 
+# =====================================================
+# RESUMEN Y GUARDADO
+# =====================================================
 with st.container(border=True):
     st.subheader("📌 Resumen y guardado")
 
@@ -206,6 +245,9 @@ with st.container(border=True):
         type="primary"
     )
 
+# =====================================================
+# GUARDADO FINAL
+# =====================================================
 if guardar:
     seleccionadas = obtener_valvulas_seleccionadas()
 
