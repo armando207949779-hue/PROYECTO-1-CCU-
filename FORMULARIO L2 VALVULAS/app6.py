@@ -6,6 +6,9 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+# =====================================================
+# CONFIGURACIÓN GENERAL
+# =====================================================
 st.set_page_config(
     page_title="Panel Mantenimiento Válvulas L2",
     page_icon="🔧",
@@ -19,6 +22,9 @@ TURNOS = ["A", "B", "C"]
 NUMEROS_VALVULA = list(range(1, 113))
 REPUESTOS = ["BLOQUE", "O-RINGS", "RESORTE", "ON/OFF", "OTRO"]
 
+# =====================================================
+# CONEXIÓN GOOGLE SHEETS
+# =====================================================
 @st.cache_resource
 def conectar():
     scope = [
@@ -63,10 +69,35 @@ def guardar_registros(filas):
     ws.append_rows(filas, value_input_option="USER_ENTERED")
 
 
-if "valvulas_seleccionadas" not in st.session_state:
-    st.session_state.valvulas_seleccionadas = []
+# =====================================================
+# ESTADO DE CHECKBOXES
+# =====================================================
+for numero in NUMEROS_VALVULA:
+    key = f"chk_valvula_{numero}"
+    if key not in st.session_state:
+        st.session_state[key] = False
 
 
+def seleccionar_todas():
+    for numero in NUMEROS_VALVULA:
+        st.session_state[f"chk_valvula_{numero}"] = True
+
+
+def limpiar_seleccion():
+    for numero in NUMEROS_VALVULA:
+        st.session_state[f"chk_valvula_{numero}"] = False
+
+
+def obtener_valvulas_seleccionadas():
+    return [
+        numero for numero in NUMEROS_VALVULA
+        if st.session_state.get(f"chk_valvula_{numero}", False)
+    ]
+
+
+# =====================================================
+# ESTILO COMPACTO
+# =====================================================
 st.markdown(
     """
     <style>
@@ -100,6 +131,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# =====================================================
+# ENCABEZADO
+# =====================================================
 st.markdown(
     """
     <div style='text-align:center; padding: 4px 0 8px 0;'>
@@ -111,6 +145,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# =====================================================
+# PANEL DE DATOS GENERALES
+# =====================================================
 with st.container(border=True):
     st.subheader("📝 Datos generales")
 
@@ -137,24 +174,33 @@ with st.container(border=True):
         height=70
     )
 
+# =====================================================
+# PANEL DE SELECCIÓN DE VÁLVULAS
+# =====================================================
 with st.container(border=True):
     st.subheader("🔘 Selección de válvulas")
 
     col_a, col_b, col_c = st.columns([1, 1, 4])
 
     with col_a:
-        if st.button("✅ Seleccionar todas", use_container_width=True):
-            st.session_state.valvulas_seleccionadas = NUMEROS_VALVULA.copy()
-            st.rerun()
+        st.button(
+            "✅ Seleccionar todas",
+            use_container_width=True,
+            on_click=seleccionar_todas
+        )
 
     with col_b:
-        if st.button("🧹 Limpiar", use_container_width=True):
-            st.session_state.valvulas_seleccionadas = []
-            st.rerun()
+        st.button(
+            "🧹 Limpiar",
+            use_container_width=True,
+            on_click=limpiar_seleccion
+        )
+
+    seleccionadas = obtener_valvulas_seleccionadas()
 
     with col_c:
         st.info(
-            f"Seleccionadas: {len(st.session_state.valvulas_seleccionadas)}",
+            f"Seleccionadas: {len(seleccionadas)}",
             icon="📌"
         )
 
@@ -165,22 +211,18 @@ with st.container(border=True):
 
         for i, numero in enumerate(range(inicio, min(inicio + columnas, 113))):
             with cols[i]:
-                seleccionado = st.checkbox(
+                st.checkbox(
                     f"{numero}",
-                    value=numero in st.session_state.valvulas_seleccionadas,
                     key=f"chk_valvula_{numero}"
                 )
 
-                if seleccionado and numero not in st.session_state.valvulas_seleccionadas:
-                    st.session_state.valvulas_seleccionadas.append(numero)
-
-                elif not seleccionado and numero in st.session_state.valvulas_seleccionadas:
-                    st.session_state.valvulas_seleccionadas.remove(numero)
-
+# =====================================================
+# RESUMEN Y GUARDADO
+# =====================================================
 with st.container(border=True):
     st.subheader("📌 Resumen y guardado")
 
-    seleccionadas = sorted(st.session_state.valvulas_seleccionadas)
+    seleccionadas = obtener_valvulas_seleccionadas()
 
     if seleccionadas:
         st.success(
@@ -196,7 +238,12 @@ with st.container(border=True):
         type="primary"
     )
 
+# =====================================================
+# GUARDADO FINAL
+# =====================================================
 if guardar:
+    seleccionadas = obtener_valvulas_seleccionadas()
+
     if not operador.strip():
         st.error("❌ El operador no puede estar vacío.")
 
@@ -227,7 +274,7 @@ if guardar:
             )
 
             st.balloons()
-            st.session_state.valvulas_seleccionadas = []
+            limpiar_seleccion()
 
         except Exception as e:
             st.error(f"❌ Error al guardar: {e}")
