@@ -6,9 +6,6 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-# =====================================================
-# CONFIGURACIÓN GENERAL
-# =====================================================
 st.set_page_config(
     page_title="Panel Mantenimiento Válvulas L2",
     page_icon="🔧",
@@ -22,9 +19,6 @@ TURNOS = ["A", "B", "C"]
 NUMEROS_VALVULA = list(range(1, 113))
 REPUESTOS = ["BLOQUE", "O-RINGS", "RESORTE", "ON/OFF", "OTRO"]
 
-# =====================================================
-# CONEXIÓN GOOGLE SHEETS
-# =====================================================
 @st.cache_resource
 def conectar():
     scope = [
@@ -43,19 +37,11 @@ def conectar():
 
 def init_sheet(ws):
     headers = [
-        "Fecha",
-        "Turno",
-        "Operador",
-        "Número Válvula",
-        "Repuesto",
-        "Observaciones",
-        "Fecha registro"
+        "Fecha", "Turno", "Operador", "Número Válvula",
+        "Repuesto", "Observaciones", "Fecha registro"
     ]
 
-    try:
-        if ws.row_values(1) != headers:
-            ws.update("A1:G1", [headers])
-    except Exception:
+    if ws.row_values(1) != headers:
         ws.update("A1:G1", [headers])
 
 
@@ -69,20 +55,10 @@ def guardar_registros(filas):
     ws.append_rows(filas, value_input_option="USER_ENTERED")
 
 
-# =====================================================
-# ESTADO DE CHECKBOXES
-# =====================================================
 for numero in NUMEROS_VALVULA:
     key = f"chk_valvula_{numero}"
     if key not in st.session_state:
         st.session_state[key] = False
-
-# Limpieza segura después de guardar, antes de crear los widgets
-if st.session_state.get("limpiar_despues_guardar", False):
-    for numero in NUMEROS_VALVULA:
-        st.session_state[f"chk_valvula_{numero}"] = False
-
-    st.session_state["limpiar_despues_guardar"] = False
 
 
 def seleccionar_todas():
@@ -102,9 +78,6 @@ def obtener_valvulas_seleccionadas():
     ]
 
 
-# =====================================================
-# ESTILO COMPACTO
-# =====================================================
 st.markdown(
     """
     <style>
@@ -138,9 +111,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# =====================================================
-# ENCABEZADO
-# =====================================================
 st.markdown(
     """
     <div style='text-align:center; padding: 4px 0 8px 0;'>
@@ -152,9 +122,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# =====================================================
-# PANEL DE DATOS GENERALES
-# =====================================================
 with st.container(border=True):
     st.subheader("📝 Datos generales")
 
@@ -181,9 +148,6 @@ with st.container(border=True):
         height=70
     )
 
-# =====================================================
-# PANEL DE SELECCIÓN DE VÁLVULAS COMPACTO
-# =====================================================
 with st.container(border=True):
     st.subheader("🔘 Selección de válvulas")
 
@@ -223,9 +187,6 @@ with st.container(border=True):
                     key=f"chk_valvula_{numero}"
                 )
 
-# =====================================================
-# RESUMEN Y GUARDADO
-# =====================================================
 with st.container(border=True):
     st.subheader("📌 Resumen y guardado")
 
@@ -245,9 +206,6 @@ with st.container(border=True):
         type="primary"
     )
 
-# =====================================================
-# GUARDADO FINAL
-# =====================================================
 if guardar:
     seleccionadas = obtener_valvulas_seleccionadas()
 
@@ -281,10 +239,6 @@ if guardar:
             )
 
             st.balloons()
-
-            # Limpieza segura después de guardar
-            st.session_state["limpiar_despues_guardar"] = True
-            st.rerun()
 
         except Exception as e:
             st.error(f"❌ Error al guardar: {e}")
