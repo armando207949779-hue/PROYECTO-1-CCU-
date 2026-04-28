@@ -55,7 +55,7 @@ def init_sheet(ws):
     try:
         if ws.row_values(1) != headers:
             ws.update("A1:G1", [headers])
-    except:
+    except Exception:
         ws.update("A1:G1", [headers])
 
 
@@ -68,137 +68,223 @@ def guardar_registros(filas):
     init_sheet(ws)
     ws.append_rows(filas, value_input_option="USER_ENTERED")
 
+
 # =====================================================
-# ESTADO CHECKBOXES
+# ESTADO DE CHECKBOXES
 # =====================================================
 for numero in NUMEROS_VALVULA:
     key = f"chk_valvula_{numero}"
     if key not in st.session_state:
         st.session_state[key] = False
 
-# 🔥 Limpieza segura después de guardar
+# Limpieza segura después de guardar, antes de crear los widgets
 if st.session_state.get("limpiar_despues_guardar", False):
     for numero in NUMEROS_VALVULA:
         st.session_state[f"chk_valvula_{numero}"] = False
+
     st.session_state["limpiar_despues_guardar"] = False
+
 
 def seleccionar_todas():
     for numero in NUMEROS_VALVULA:
         st.session_state[f"chk_valvula_{numero}"] = True
 
-def limpiar():
+
+def limpiar_seleccion():
     for numero in NUMEROS_VALVULA:
         st.session_state[f"chk_valvula_{numero}"] = False
 
+
 def obtener_valvulas_seleccionadas():
     return [
-        n for n in NUMEROS_VALVULA
-        if st.session_state.get(f"chk_valvula_{n}", False)
+        numero for numero in NUMEROS_VALVULA
+        if st.session_state.get(f"chk_valvula_{numero}", False)
     ]
 
+
 # =====================================================
-# ESTILO
+# ESTILO COMPACTO
 # =====================================================
-st.markdown("""
-<style>
-div[data-testid="stCheckbox"] {
-    margin-bottom: -14px;
-}
-div[data-testid="stCheckbox"] label {
-    font-size: 0.72rem;
-}
-</style>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 1.2rem;
+        padding-bottom: 1.2rem;
+    }
+
+    div[data-testid="stCheckbox"] {
+        margin-bottom: -14px;
+    }
+
+    div[data-testid="stCheckbox"] label {
+        font-size: 0.72rem;
+        min-height: 0.8rem;
+    }
+
+    div[data-testid="stCheckbox"] p {
+        font-size: 0.72rem;
+    }
+
+    div[data-testid="stVerticalBlock"] {
+        gap: 0.35rem;
+    }
+
+    h1, h2, h3 {
+        margin-bottom: 0.2rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # =====================================================
 # ENCABEZADO
 # =====================================================
-st.markdown("""
-<div style='text-align:center'>
-<h1>🔧 PANEL DE MANTENIMIENTO</h1>
-<h3>VÁLVULAS KRONES · LÍNEA 2</h3>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+    <div style='text-align:center; padding: 4px 0 8px 0;'>
+        <h1 style='color:#0E4C92; margin-bottom:2px;'>🔧 PANEL DE MANTENIMIENTO</h1>
+        <h3 style='color:#2E86C1; margin-top:0px;'>VÁLVULAS KRONES · LÍNEA 2</h3>
+        <p style='color:#5D6D7E; margin-bottom:4px;'>Seleccione las válvulas intervenidas y registre la mantención.</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 # =====================================================
-# DATOS GENERALES
+# PANEL DE DATOS GENERALES
 # =====================================================
 with st.container(border=True):
+    st.subheader("📝 Datos generales")
+
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        fecha = st.date_input("Fecha")
+        fecha = st.date_input("📅 Fecha")
 
     with col2:
-        turno = st.selectbox("Turno", TURNOS)
+        turno = st.selectbox("👷 Turno", TURNOS)
 
     with col3:
-        operador = st.text_input("Operador").upper()
+        operador = st.text_input(
+            "👤 Operador",
+            placeholder="Ej: JUAN PEREZ"
+        ).upper()
 
     with col4:
-        repuesto = st.selectbox("Repuesto", REPUESTOS)
+        repuesto = st.selectbox("📦 Repuesto", REPUESTOS)
 
-    observaciones = st.text_area("Observaciones")
+    observaciones = st.text_area(
+        "📋 Observaciones",
+        placeholder="Ingrese observaciones generales del mantenimiento...",
+        height=70
+    )
 
 # =====================================================
-# SELECCIÓN VÁLVULAS
+# PANEL DE SELECCIÓN DE VÁLVULAS COMPACTO
 # =====================================================
 with st.container(border=True):
+    st.subheader("🔘 Selección de válvulas")
 
-    col_a, col_b, col_c = st.columns([1,1,4])
+    col_a, col_b, col_c = st.columns([1, 1, 4])
 
-    col_a.button("Seleccionar todas", on_click=seleccionar_todas)
-    col_b.button("Limpiar", on_click=limpiar)
+    with col_a:
+        st.button(
+            "✅ Seleccionar todas",
+            use_container_width=True,
+            on_click=seleccionar_todas
+        )
+
+    with col_b:
+        st.button(
+            "🧹 Limpiar",
+            use_container_width=True,
+            on_click=limpiar_seleccion
+        )
 
     seleccionadas = obtener_valvulas_seleccionadas()
-    col_c.info(f"Seleccionadas: {len(seleccionadas)}")
+
+    with col_c:
+        st.info(
+            f"Seleccionadas: {len(seleccionadas)}",
+            icon="📌"
+        )
 
     columnas = 14
 
-    for i in range(1, 113, columnas):
+    for inicio in range(1, 113, columnas):
         cols = st.columns(columnas)
 
-        for j, numero in enumerate(range(i, min(i+columnas,113))):
-            with cols[j]:
-                st.checkbox(str(numero), key=f"chk_valvula_{numero}")
+        for i, numero in enumerate(range(inicio, min(inicio + columnas, 113))):
+            with cols[i]:
+                st.checkbox(
+                    f"{numero}",
+                    key=f"chk_valvula_{numero}"
+                )
 
 # =====================================================
-# GUARDAR
+# RESUMEN Y GUARDADO
 # =====================================================
-guardar = st.button("💾 Guardar")
-
-if guardar:
+with st.container(border=True):
+    st.subheader("📌 Resumen y guardado")
 
     seleccionadas = obtener_valvulas_seleccionadas()
 
-    if not operador.strip():
-        st.error("Operador vacío")
+    if seleccionadas:
+        st.success(
+            f"Total seleccionadas: {len(seleccionadas)} | "
+            f"Válvulas: {', '.join([str(v) for v in seleccionadas])}"
+        )
+    else:
+        st.warning("No hay válvulas seleccionadas.")
 
-    elif not seleccionadas:
-        st.error("Selecciona válvulas")
+    guardar = st.button(
+        "💾 Guardar registros en Google Sheets",
+        use_container_width=True,
+        type="primary"
+    )
+
+# =====================================================
+# GUARDADO FINAL
+# =====================================================
+if guardar:
+    seleccionadas = obtener_valvulas_seleccionadas()
+
+    if not operador.strip():
+        st.error("❌ El operador no puede estar vacío.")
+
+    elif len(seleccionadas) == 0:
+        st.error("❌ Debe seleccionar al menos una válvula.")
 
     else:
+        fecha_registro = obtener_hora_chile()
+
         filas = []
 
-        for v in seleccionadas:
+        for valvula in seleccionadas:
             filas.append([
                 fecha.strftime("%d-%m-%Y"),
                 turno,
                 operador,
-                v,
+                valvula,
                 repuesto,
                 observaciones,
-                obtener_hora_chile()
+                fecha_registro
             ])
 
         try:
             guardar_registros(filas)
-            st.success(f"Guardado OK ({len(filas)} registros)")
+
+            st.success(
+                f"✅ Se guardaron {len(filas)} registros correctamente en Google Sheets."
+            )
+
             st.balloons()
 
-            # 🔥 limpieza segura
+            # Limpieza segura después de guardar
             st.session_state["limpiar_despues_guardar"] = True
             st.rerun()
 
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"❌ Error al guardar: {e}")
