@@ -1,4 +1,4 @@
-# App8 Streamlit Formulario Tulipas Línea 2 - MATRIZ ACTUALIZADA
+# App Streamlit Formulario Tulipas Línea 11 - MATRIZ POR FORMATO
 
 import streamlit as st
 import gspread
@@ -7,26 +7,35 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 st.set_page_config(
-    page_title="Formulario Mantenimiento Tulipas Línea 2",
+    page_title="Formulario Mantenimiento Tulipas Línea 11",
     layout="centered"
 )
 
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1EjrHHNJXjjBOObeAfIBxQjDfcyCS-o_j4FLaDxOPjRI/edit?usp=sharing"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1PmDo4EjBxXZx0fPMGPMJKzBztyAq8AipxqCsJTFI0e0/edit?usp=sharing"
 ZONA_HORARIA = ZoneInfo("America/Santiago")
 
 TURNOS = ["", "A", "B", "C"]
 
 OPERADORES = [
     "",
-    "RICHARD RUZ",
-    "DIDIMO VALERO",
-    "JORGE GONZALES",
-    "JUAN RUPERTUS MONDACA",
+    "JORGE MUÑOZ",
+    "LUIS SOTO",
+    "ISMAEL BRIONES",
     "OTRO"
 ]
 
 EQUIPOS = ["", "Encajonadora", "Desencajonadora"]
-FORMATOS = ["", "2000 CC", "2500 CC"]
+
+FORMATOS = ["", "237 CC", "350 CC", "1000 CC", "1250 CC"]
+
+CABEZALES_POR_FORMATO = {
+    "237 CC": list(range(1, 7)),      # C1 a C6
+    "350 CC": list(range(1, 8)),      # C1 a C7
+    "1000 CC": list(range(1, 10)),    # C1 a C9
+    "1250 CC": list(range(1, 10))     # C1 a C9
+}
+
+TULIPAS = list(range(1, 31))
 
 MANTENCIONES = [
     "",
@@ -94,10 +103,10 @@ st.markdown(
             FORMULARIO DE MANTENIMIENTO
         </h1>
         <h2 style='color:#2E86C1; margin-top:0px; font-size: 1.25rem; font-weight: 600;'>
-            LÍNEA 2 · TULIPAS
+            LÍNEA 11 · TULIPAS
         </h2>
         <p style='color:#5D6D7E; font-size: 1rem; margin-top: 8px;'>
-            Registro de mantenciones de tulipas
+            Registro de mantenciones por formato, cabezal y tulipa
         </p>
         <hr style='border: 1px solid #D6EAF8; width:75%; margin-top: 10px;'>
     </div>
@@ -120,7 +129,10 @@ with st.container(border=True):
     operador_manual = ""
 
     if operador_sel == "OTRO":
-        operador_manual = st.text_input("Especificar operador").upper().strip()
+        operador_manual = st.text_input(
+            "Especificar operador",
+            placeholder="Ingrese nombre del operador"
+        ).upper().strip()
 
     operador_final = operador_manual if operador_sel == "OTRO" else operador_sel
 
@@ -135,29 +147,34 @@ with st.container(border=True):
     seleccion_tulipas = []
 
     if formato == "":
-        st.warning("Seleccione primero el formato.")
+        st.warning("Seleccione primero el formato para desplegar la matriz.")
     else:
-        n_cabezales = 7
-        n_tulipas = 9 if formato == "2000 CC" else 6
+        cabezales = CABEZALES_POR_FORMATO[formato]
 
-        header = st.columns(n_cabezales + 1)
+        st.caption(
+            f"Formato seleccionado: {formato} | "
+            f"Cabezales disponibles: C1 a C{max(cabezales)} | "
+            f"Tulipas disponibles: T1 a T30"
+        )
+
+        header = st.columns(len(cabezales) + 1)
 
         with header[0]:
             st.markdown("**Tulipa**")
 
-        for c in range(1, n_cabezales + 1):
-            with header[c]:
+        for idx, c in enumerate(cabezales, start=1):
+            with header[idx]:
                 st.markdown(f"**C{c}**")
 
-        for t in range(1, n_tulipas + 1):
-            cols = st.columns(n_cabezales + 1)
+        for t in TULIPAS:
+            cols = st.columns(len(cabezales) + 1)
 
             with cols[0]:
                 st.markdown(f"**T{t}**")
 
-            for c in range(1, n_cabezales + 1):
-                with cols[c]:
-                    key = f"cabezal_{c}_tulipa_{t}"
+            for idx, c in enumerate(cabezales, start=1):
+                with cols[idx]:
+                    key = f"formato_{formato}_cabezal_{c}_tulipa_{t}"
 
                     seleccionado = st.checkbox(
                         label="",
@@ -208,7 +225,7 @@ with st.container(border=True):
     st.write("Equipo:", equipo)
     st.write("Formato:", formato)
     st.write("Mantención:", mantencion_final)
-    st.write("Tulipas seleccionadas:", seleccion_tulipas)
+    st.write("Tulipas seleccionadas:", seleccion_tulipas if seleccion_tulipas else "-")
 
     guardar = st.button("Guardar registro", use_container_width=True)
 
@@ -275,7 +292,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Tulipas Línea 2</b> · v8.2<br>
+        <b>Formulario Mantenimiento Tulipas Línea 11</b> · v3.0<br>
         Streamlit · Google Sheets
     </div>
     """,
