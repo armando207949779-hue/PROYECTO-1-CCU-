@@ -2,10 +2,10 @@
 Portal Global CCU
 App principal para navegar entre dashboards de Línea 2 y Línea 11.
 
-Ubicación recomendada:
+Ubicación:
 PROYECTO-1-CCU-/
 └── app_global/
-    └── app.py
+    └── app_global.py
 """
 
 import base64
@@ -183,9 +183,7 @@ def pagina_inicio():
 
     st.markdown("---")
 
-    st.caption(
-        "Portal central conectado a dashboards Streamlit del repositorio GitHub."
-    )
+    st.caption("Portal central conectado a dashboards Streamlit del repositorio GitHub.")
 
 
 # =====================================================
@@ -233,34 +231,40 @@ pagina = st.navigation(
             st.Page(
                 pagina_inicio,
                 title="Inicio",
-                icon="🏠"
+                icon="🏠",
+                url_path="inicio"
             )
         ],
         "Línea 2": [
             st.Page(
                 APP_L2_TULIPAS,
                 title="Tulipas",
-                icon="🧩"
+                icon="🧩",
+                url_path="linea-2-tulipas"
             ),
             st.Page(
                 APP_L2_VALVULAS,
                 title="Válvulas",
-                icon="⚙️"
+                icon="⚙️",
+                url_path="linea-2-valvulas"
             ),
         ],
         "Línea 11": [
             st.Page(
                 APP_L11_TULIPAS,
                 title="Tulipas",
-                icon="🧩"
+                icon="🧩",
+                url_path="linea-11-tulipas"
             ),
             st.Page(
                 APP_L11_VALVULAS,
                 title="Válvulas",
-                icon="⚙️"
+                icon="⚙️",
+                url_path="linea-11-valvulas"
             ),
         ],
-    }
+    },
+    expanded=True
 )
 
 pagina.run()
