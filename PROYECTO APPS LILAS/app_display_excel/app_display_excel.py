@@ -18,9 +18,8 @@ if archivo is not None:
 
         df = pd.read_excel(archivo, sheet_name=hoja, engine="openpyxl")
 
-        # Mantener todas las columnas, incluso si tienen nombres vacíos
         df.columns = [
-            str(col) if str(col) != "nan" else f"Columna_{i + 1}"
+            str(col).strip() if str(col) != "nan" else f"Columna_{i + 1}"
             for i, col in enumerate(df.columns)
         ]
 
@@ -58,14 +57,15 @@ if archivo is not None:
                 )
             ]
 
-        # Crear filtros para TODAS las columnas por defecto
         columnas_para_filtrar = list(df.columns)
 
         for columna in columnas_para_filtrar:
-            with st.sidebar.expander(f"Filtrar: {columna}", expanded=False):
+            # Abrir por defecto el filtro Maquina
+            expandido = columna.strip().lower() == "maquina"
+
+            with st.sidebar.expander(f"Filtrar: {columna}", expanded=expandido):
                 serie_original = df[columna]
 
-                # Intentar detectar fechas
                 serie_fecha = pd.to_datetime(serie_original, errors="coerce")
                 total_no_nulos = len(serie_original.dropna())
 
@@ -74,7 +74,6 @@ if archivo is not None:
                     and serie_fecha.notna().sum() >= total_no_nulos * 0.7
                 )
 
-                # Filtro numérico
                 if pd.api.types.is_numeric_dtype(serie_original):
                     minimo = serie_original.min()
                     maximo = serie_original.max()
@@ -101,7 +100,6 @@ if archivo is not None:
                     else:
                         st.caption("Columna numérica sin valores válidos.")
 
-                # Filtro fecha
                 elif es_fecha:
                     fechas_validas = serie_fecha.dropna()
 
@@ -132,22 +130,35 @@ if archivo is not None:
                     else:
                         st.caption("Columna de fecha sin valores válidos.")
 
-                # Filtro texto / categoría
                 else:
+                    es_columna_maquina = columna.strip().lower() == "maquina"
+
+                    opciones_filtro = [
+                        "Contiene",
+                        "Contiene palabra exacta",
+                        "Igual a",
+                        "Empieza con",
+                        "Termina con"
+                    ]
+
+                    tipo_default = (
+                        opciones_filtro.index("Contiene palabra exacta")
+                        if es_columna_maquina
+                        else opciones_filtro.index("Contiene")
+                    )
+
                     tipo_filtro_texto = st.selectbox(
                         "Tipo de filtro",
-                        options=[
-                            "Contiene",
-                            "Contiene palabra exacta",
-                            "Igual a",
-                            "Empieza con",
-                            "Termina con"
-                        ],
+                        options=opciones_filtro,
+                        index=tipo_default,
                         key=f"tipo_texto_{columna}"
                     )
 
+                    texto_default = "L2" if es_columna_maquina else ""
+
                     texto = st.text_input(
                         "Texto a filtrar",
+                        value=texto_default,
                         key=f"texto_{columna}"
                     )
 
