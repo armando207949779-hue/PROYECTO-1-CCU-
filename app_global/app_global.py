@@ -2,26 +2,10 @@
 Portal Global CCU
 App principal para navegar entre dashboards de Línea 2 y Línea 11.
 
-Estructura esperada del proyecto:
-
+Ubicación recomendada:
 PROYECTO-1-CCU-/
-│
-├── app.py
-├── requirements.txt
-├── assets/
-│   └── CCU_logo_(2018).svg.png
-│
-├── DASHBOARD L2 TULIPAS/
-│   └── app13.py
-│
-├── DASHBOARD L2 VALVULAS/
-│   └── app13.py
-│
-├── DASHBOARD L11 TULIPAS/
-│   └── app9.py
-│
-└── DASHBOARD L11 VALVULAS/
-    └── app14.py
+└── app_global/
+    └── app.py
 """
 
 import base64
@@ -35,13 +19,14 @@ import streamlit as st
 # =====================================================
 
 BASE_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = BASE_DIR.parent
 
-LOGO_PATH = BASE_DIR / "assets" / "CCU_logo_(2018).svg.png"
+LOGO_PATH = PROJECT_DIR / "assets" / "CCU_logo_(2018).svg.png"
 
-APP_L2_TULIPAS = BASE_DIR / "DASHBOARD L2 TULIPAS" / "app13.py"
-APP_L2_VALVULAS = BASE_DIR / "DASHBOARD L2 VALVULAS" / "app13.py"
-APP_L11_TULIPAS = BASE_DIR / "DASHBOARD L11 TULIPAS" / "app9.py"
-APP_L11_VALVULAS = BASE_DIR / "DASHBOARD L11 VALVULAS" / "app14.py"
+APP_L2_TULIPAS = PROJECT_DIR / "DASHBOARD L2 TULIPAS" / "app13.py"
+APP_L2_VALVULAS = PROJECT_DIR / "DASHBOARD L2 VALVULAS" / "app13.py"
+APP_L11_TULIPAS = PROJECT_DIR / "DASHBOARD L11 TULIPAS" / "app9.py"
+APP_L11_VALVULAS = PROJECT_DIR / "DASHBOARD L11 VALVULAS" / "app14.py"
 
 
 # =====================================================
@@ -53,6 +38,34 @@ st.set_page_config(
     page_icon="🏭",
     layout="wide",
     initial_sidebar_state="expanded"
+)
+
+
+# =====================================================
+# ESTILO GENERAL
+# =====================================================
+
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 0.5rem;
+        padding-bottom: 1rem;
+    }
+
+    h1 {
+        text-align: center;
+        color: #0E4C92;
+        line-height: 1.15;
+    }
+
+    h2 {
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 0.4rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 
@@ -91,34 +104,6 @@ def mostrar_logo_centrado():
         )
     else:
         st.warning(f"Logo no encontrado: {LOGO_PATH}")
-
-
-# =====================================================
-# ESTILO GENERAL
-# =====================================================
-
-st.markdown(
-    """
-    <style>
-    .block-container {
-        padding-top: 0.5rem;
-        padding-bottom: 1rem;
-    }
-
-    h1 {
-        text-align: center;
-        color: #0E4C92;
-        line-height: 1.15;
-    }
-
-    h2 {
-        border-bottom: 2px solid #3498db;
-        padding-bottom: 0.4rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 
 # =====================================================
@@ -227,8 +212,13 @@ if apps_faltantes:
         "No se encontraron una o más apps. Revisa los nombres de carpetas y archivos."
     )
 
-    for nombre, ruta in apps_faltantes.items():
-        st.write(f"**{nombre}:** `{ruta}`")
+    st.write("### Rutas buscadas")
+
+    for nombre, ruta in apps_requeridas.items():
+        if ruta.exists():
+            st.success(f"{nombre}: `{ruta}`")
+        else:
+            st.error(f"{nombre}: `{ruta}`")
 
     st.stop()
 
