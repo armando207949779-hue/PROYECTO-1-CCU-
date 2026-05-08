@@ -1,6 +1,6 @@
 # App Streamlit: Registro mantenimiento válvulas KRONES Línea 11
 # Versión con logo, formato mejorado, margen corregido, operadores actualizados
-# y resumen homologado a Línea 2 Válvulas
+# resumen homologado a Línea 2 Válvulas y selector "Seleccione"
 
 import streamlit as st
 import gspread
@@ -307,7 +307,7 @@ with st.container(border=True):
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        repuesto_sel = st.selectbox("Seleccione repuesto o mantención", [""] + REPUESTOS)
+        repuesto_sel = st.selectbox("Seleccione", [""] + REPUESTOS)
 
     with col2:
         otro_repuesto = ""
@@ -453,7 +453,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Válvulas KRONES Línea 11</b> · v1.3<br>
+        <b>Formulario Mantenimiento Válvulas KRONES Línea 11</b> · v1.4<br>
         Streamlit · Google Sheets
     </div>
     """,
