@@ -374,10 +374,11 @@ def grafico_tendencia_temporal(df):
         hovertemplate="<b>%{x|%d-%m-%Y}</b><br>MA7: %{y:.1f}<extra></extra>"
     ))
 
-    aplicar_estilo_figura(fig, "Tendencia temporal de registros", 360)
+    aplicar_estilo_figura(fig, "Tendencia temporal de registros", 380)
     fig.update_layout(
         xaxis_title="Fecha",
         yaxis_title="Registros",
+        margin=dict(l=70, r=80, t=85, b=75),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -395,45 +396,93 @@ def grafico_por_turno(df):
     vc.columns = ["Turno", "Cantidad"]
     vc = vc.sort_values("Turno")
 
+    detalle_operadores = (
+        df.assign(Operador=df["Operador"].replace("", "SIN OPERADOR"))
+        .groupby(["Turno", "Operador"])
+        .size()
+        .reset_index(name="Registros")
+        .sort_values(["Turno", "Registros"], ascending=[True, False])
+    )
+
+    operadores_por_turno = {}
+
+    for turno in vc["Turno"]:
+        subset = detalle_operadores[detalle_operadores["Turno"] == turno]
+
+        if subset.empty:
+            operadores_por_turno[turno] = "Sin operadores"
+        else:
+            operadores_por_turno[turno] = "<br>".join(
+                f"• {row['Operador']}: {row['Registros']}"
+                for _, row in subset.iterrows()
+            )
+
+    vc["Detalle operadores"] = vc["Turno"].map(operadores_por_turno)
+
     fig = go.Figure(data=[go.Bar(
         x=vc["Turno"],
         y=vc["Cantidad"],
         marker=dict(color="#3498db"),
         text=vc["Cantidad"],
         textposition="outside",
-        hovertemplate="<b>Turno %{x}</b><br>Registros: %{y}<extra></extra>"
+        cliponaxis=False,
+        customdata=vc["Detalle operadores"],
+        hovertemplate=(
+            "<b>Turno %{x}</b><br>"
+            "Registros: <b>%{y}</b><br><br>"
+            "<b>Operadores:</b><br>%{customdata}"
+            "<extra></extra>"
+        )
     )])
 
-    aplicar_estilo_figura(fig, "Registros por turno", 320)
+    aplicar_estilo_figura(fig, "Registros por turno", 360, t=85, b=75)
     fig.update_layout(
         xaxis_title="Turno",
         yaxis_title="Cantidad",
-        showlegend=False
+        showlegend=False,
+        margin=dict(l=70, r=80, t=85, b=75)
     )
+
+    max_y = vc["Cantidad"].max() if not vc.empty else 1
+    fig.update_yaxes(range=[0, max_y * 1.25])
 
     return fig
 
 
 def grafico_por_operador(df):
-    op = df["Operador"].replace("", "SIN OPERADOR").value_counts().head(10).reset_index()
+    op = (
+        df["Operador"]
+        .replace("", "SIN OPERADOR")
+        .value_counts()
+        .head(10)
+        .reset_index()
+    )
+
     op.columns = ["Operador", "Cantidad"]
-    op = op.sort_values("Cantidad")
+    op = op.sort_values("Cantidad", ascending=False)
 
     fig = go.Figure(data=[go.Bar(
-        y=op["Operador"],
-        x=op["Cantidad"],
-        orientation="h",
+        x=op["Operador"],
+        y=op["Cantidad"],
         marker=dict(color="#2ecc71"),
         text=op["Cantidad"],
         textposition="outside",
-        hovertemplate="<b>%{y}</b><br>Registros: %{x}<extra></extra>"
+        cliponaxis=False,
+        hovertemplate="<b>%{x}</b><br>Registros: %{y}<extra></extra>"
     )])
 
-    aplicar_estilo_figura(fig, "Top operadores", 320, l=160)
+    aplicar_estilo_figura(fig, "Top operadores", 420, t=85, b=150)
     fig.update_layout(
-        xaxis_title="Cantidad",
-        showlegend=False
+        xaxis_title="Operador",
+        yaxis_title="Cantidad",
+        showlegend=False,
+        margin=dict(l=70, r=80, t=85, b=155)
     )
+
+    fig.update_xaxes(tickangle=-35)
+
+    max_y = op["Cantidad"].max() if not op.empty else 1
+    fig.update_yaxes(range=[0, max_y * 1.25])
 
     return fig
 
@@ -441,23 +490,34 @@ def grafico_por_operador(df):
 def grafico_por_mantencion(df):
     mt = df["Mantención"].replace("", "SIN MANTENCIÓN").value_counts().reset_index()
     mt.columns = ["Mantención", "Cantidad"]
-    mt = mt.sort_values("Cantidad")
+    mt = mt.sort_values("Cantidad", ascending=False)
 
     fig = go.Figure(data=[go.Bar(
-        y=mt["Mantención"],
-        x=mt["Cantidad"],
-        orientation="h",
-        marker=dict(color=mt["Cantidad"], colorscale="Blues", showscale=False),
+        x=mt["Mantención"],
+        y=mt["Cantidad"],
+        marker=dict(
+            color=mt["Cantidad"],
+            colorscale="Blues",
+            showscale=False
+        ),
         text=mt["Cantidad"],
         textposition="outside",
-        hovertemplate="<b>%{y}</b><br>Registros: %{x}<extra></extra>"
+        cliponaxis=False,
+        hovertemplate="<b>%{x}</b><br>Registros: %{y}<extra></extra>"
     )])
 
-    aplicar_estilo_figura(fig, "Tipos de mantención", 380, l=260)
+    aplicar_estilo_figura(fig, "Tipos de mantención", 430, t=85, b=160)
     fig.update_layout(
-        xaxis_title="Cantidad",
-        showlegend=False
+        xaxis_title="Tipo de mantención",
+        yaxis_title="Cantidad",
+        showlegend=False,
+        margin=dict(l=70, r=80, t=85, b=165)
     )
+
+    fig.update_xaxes(tickangle=-35)
+
+    max_y = mt["Cantidad"].max() if not mt.empty else 1
+    fig.update_yaxes(range=[0, max_y * 1.25])
 
     return fig
 
@@ -482,12 +542,27 @@ def grafico_equipos_formatos(df):
         }
     )
 
-    aplicar_estilo_figura(fig, "Registros por equipo y formato", 340)
+    fig.update_traces(
+        textposition="outside",
+        cliponaxis=False,
+        hovertemplate=(
+            "<b>%{x}</b><br>"
+            "Formato: %{fullData.name}<br>"
+            "Registros: %{y}"
+            "<extra></extra>"
+        )
+    )
+
+    aplicar_estilo_figura(fig, "Registros por equipo y formato", 400, t=90, b=95)
     fig.update_layout(
         xaxis_title="Equipo",
         yaxis_title="Cantidad",
-        legend_title_text="Formato"
+        legend_title_text="Formato",
+        margin=dict(l=70, r=90, t=90, b=100)
     )
+
+    max_y = dist["Cantidad"].max() if not dist.empty else 1
+    fig.update_yaxes(range=[0, max_y * 1.25])
 
     return fig
 
@@ -670,21 +745,47 @@ def grafico_top_tulipas(df, top_n=15):
         "-T" + top["Tulipa"].astype(str)
     )
 
+    top["Detalle"] = (
+        top["Equipo"].astype(str) +
+        " · " +
+        top["Formato"].astype(str) +
+        "<br>Cabezal: " +
+        top["Cabezal"].astype(str) +
+        "<br>Tulipa: " +
+        top["Tulipa"].astype(str)
+    )
+
     fig = go.Figure(go.Bar(
-        x=top["Frecuencia"],
-        y=top["Etiqueta"],
-        orientation="h",
-        marker=dict(color=top["Frecuencia"], colorscale="YlOrRd", showscale=False),
+        x=top["Etiqueta"],
+        y=top["Frecuencia"],
+        marker=dict(
+            color=top["Frecuencia"],
+            colorscale="YlOrRd",
+            showscale=False
+        ),
         text=top["Frecuencia"],
         textposition="outside",
-        hovertemplate="<b>%{y}</b><br>Frecuencia: %{x}<extra></extra>"
+        cliponaxis=False,
+        customdata=top["Detalle"],
+        hovertemplate=(
+            "<b>%{customdata}</b><br>"
+            "Frecuencia: <b>%{y}</b>"
+            "<extra></extra>"
+        )
     ))
 
-    aplicar_estilo_figura(fig, f"Top {top_n} tulipas más intervenidas", 480, l=190)
+    aplicar_estilo_figura(fig, f"Top {top_n} tulipas más intervenidas", 540, t=90, b=175)
     fig.update_layout(
-        xaxis_title="Registros",
-        yaxis=dict(categoryorder="total ascending")
+        xaxis_title="Tulipa",
+        yaxis_title="Registros",
+        showlegend=False,
+        margin=dict(l=70, r=90, t=90, b=180)
     )
+
+    fig.update_xaxes(tickangle=-45)
+
+    max_y = top["Frecuencia"].max() if not top.empty else 1
+    fig.update_yaxes(range=[0, max_y * 1.25])
 
     return fig
 
@@ -1008,19 +1109,23 @@ else:
     if any(graficos_generales):
         st.markdown("## Análisis general")
 
-        columnas = st.columns(3)
-
         if mostrar_grafico_turno:
-            with columnas[0]:
-                st.plotly_chart(grafico_por_turno(df_f), use_container_width=True)
+            st.plotly_chart(
+                grafico_por_turno(df_f),
+                use_container_width=True
+            )
 
         if mostrar_grafico_operador:
-            with columnas[1]:
-                st.plotly_chart(grafico_por_operador(df_f), use_container_width=True)
+            st.plotly_chart(
+                grafico_por_operador(df_f),
+                use_container_width=True
+            )
 
         if mostrar_grafico_equipo_formato:
-            with columnas[2]:
-                st.plotly_chart(grafico_equipos_formatos(df_f), use_container_width=True)
+            st.plotly_chart(
+                grafico_equipos_formatos(df_f),
+                use_container_width=True
+            )
 
         st.markdown("---")
 
