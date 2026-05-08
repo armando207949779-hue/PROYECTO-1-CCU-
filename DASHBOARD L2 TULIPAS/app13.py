@@ -28,7 +28,6 @@ st.set_page_config(
 # =====================================================
 # RUTAS DEL PROYECTO / LOGO
 # =====================================================
-
 BASE_DIR = Path(__file__).resolve().parent
 
 LOGO_CANDIDATES = [
@@ -74,6 +73,10 @@ st.markdown(
         border-radius: 0.5rem;
         padding: 0.5rem;
         border: 1px solid rgba(128,128,128,0.20);
+    }
+
+    div[data-testid="stMetric"] label {
+        font-size: 0.88rem;
     }
     </style>
     """,
@@ -134,6 +137,90 @@ def normalizar_formato(val):
         return "2500 CC"
 
     return str(val).strip().upper()
+
+
+def obtener_ultimo_registro(df):
+    if df.empty:
+        return "Sin datos", "-"
+
+    df_tmp = df.copy()
+
+    if "Fecha registro" in df_tmp.columns:
+        df_tmp["Fecha_orden"] = pd.to_datetime(df_tmp["Fecha registro"], errors="coerce")
+        df_tmp["Fecha_orden"] = df_tmp["Fecha_orden"].fillna(df_tmp["Fecha"])
+    else:
+        df_tmp["Fecha_orden"] = df_tmp["Fecha"]
+
+    ultimo = df_tmp.sort_values("Fecha_orden").iloc[-1]
+
+    fecha = ultimo["Fecha_orden"]
+    operador = ultimo["Operador"] if str(ultimo["Operador"]).strip() else "SIN OPERADOR"
+
+    if pd.notna(fecha):
+        fecha_txt = fecha.strftime("%d-%m-%Y %H:%M")
+    else:
+        fecha_txt = "-"
+
+    return fecha_txt, operador
+
+
+def obtener_tulipa_mas_critica(df):
+    if df.empty:
+        return "Sin datos", 0
+
+    conteo = (
+        df.groupby(["Equipo", "Formato", "Cabezal", "Tulipa"])
+        .size()
+        .reset_index(name="Intervenciones")
+        .sort_values("Intervenciones", ascending=False)
+    )
+
+    if conteo.empty:
+        return "Sin datos", 0
+
+    top = conteo.iloc[0]
+
+    etiqueta = (
+        f"{top['Equipo']} · {top['Formato']} · "
+        f"C{int(top['Cabezal'])}-T{int(top['Tulipa'])}"
+    )
+
+    return etiqueta, int(top["Intervenciones"])
+
+
+def calcular_promedio_cambio_goma(df):
+    if df.empty:
+        return None
+
+    df_tmp = df.copy()
+
+    df_tmp = df_tmp[
+        df_tmp["Mantención"]
+        .astype(str)
+        .str.upper()
+        .str.contains("CAMBIO DE GOMA", na=False)
+    ].copy()
+
+    if df_tmp.empty:
+        return None
+
+    df_tmp = df_tmp.sort_values("Fecha")
+
+    diferencias = []
+
+    for _, grupo in df_tmp.groupby(["Equipo", "Formato", "Cabezal", "Tulipa"]):
+        grupo = grupo.sort_values("Fecha").copy()
+
+        if len(grupo) < 2:
+            continue
+
+        diffs = grupo["Fecha"].diff().dt.days.dropna()
+        diferencias.extend(diffs.tolist())
+
+    if not diferencias:
+        return None
+
+    return sum(diferencias) / len(diferencias)
 
 
 # =====================================================
@@ -373,8 +460,9 @@ def crear_heatmaps_tulipas(df):
         rows=2,
         cols=2,
         subplot_titles=[f"<b>{eq} · {fmt}</b>" for eq, fmt in configs],
-        horizontal_spacing=0.16,
-        vertical_spacing=0.22,
+        horizontal_spacing=0.10,
+        vertical_spacing=0.18,
+        column_widths=[0.5, 0.5],
         specs=[
             [{"type": "heatmap"}, {"type": "heatmap"}],
             [{"type": "heatmap"}, {"type": "heatmap"}]
@@ -480,7 +568,12 @@ def crear_heatmaps_tulipas(df):
                 zmin=0,
                 zmax=zmax,
                 colorscale="YlOrRd",
-                colorbar=dict(title="Registros") if idx == 1 else None,
+                colorbar=dict(
+                    title="Registros",
+                    x=1.02,
+                    y=0.5,
+                    len=0.75
+                ) if idx == 1 else None,
                 showscale=(idx == 1),
                 text=text_display,
                 texttemplate="%{text}",
@@ -491,19 +584,26 @@ def crear_heatmaps_tulipas(df):
             col=col
         )
 
-        fig.update_xaxes(title_text="Tulipa", row=row, col=col)
-        fig.update_yaxes(title_text="Cabezal", autorange="reversed", row=row, col=col)
+        fig.update_xaxes(
+            title_text="Tulipa",
+            row=row,
+            col=col,
+            constrain="domain"
+        )
+
+        fig.update_yaxes(
+            title_text="Cabezal",
+            autorange="reversed",
+            row=row,
+            col=col,
+            scaleanchor=None
+        )
 
     fig.update_layout(
-        title=dict(
-            text="<b>Análisis específico por ubicación física</b>",
-            font=dict(size=16, color="#1a237e"),
-            x=0.5
-        ),
-        height=850,
+        height=780,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=70, r=90, t=100, b=60),
+        margin=dict(l=35, r=85, t=70, b=45),
         font=dict(family="Arial, sans-serif", size=11)
     )
 
@@ -557,7 +657,6 @@ except Exception as e:
 # =====================================================
 # ENCABEZADO CON LOGO CCU
 # =====================================================
-
 if LOGO_PATH.exists():
     logo_base64 = base64.b64encode(LOGO_PATH.read_bytes()).decode("utf-8")
 
@@ -733,6 +832,10 @@ df_f = df[
 # =====================================================
 st.markdown("### KPIs generales")
 
+ultimo_fecha, ultimo_operador = obtener_ultimo_registro(df_f)
+tulipa_critica, intervenciones_criticas = obtener_tulipa_mas_critica(df_f)
+promedio_goma = calcular_promedio_cambio_goma(df_f)
+
 m1, m2, m3, m4, m5 = st.columns(5)
 
 with m1:
@@ -754,6 +857,36 @@ with m5:
     promedio = len(df_f) / max(df_f["Fecha"].nunique(), 1)
     st.metric("Registros por día", f"{promedio:.1f}")
 
+m6, m7, m8 = st.columns(3)
+
+with m6:
+    st.metric(
+        "Último registro",
+        ultimo_fecha,
+        f"Operador: {ultimo_operador}"
+    )
+
+with m7:
+    st.metric(
+        "Tulipa más crítica",
+        tulipa_critica,
+        f"{intervenciones_criticas} intervenciones"
+    )
+
+with m8:
+    if promedio_goma is None:
+        st.metric(
+            "Cambio promedio de goma",
+            "Sin historial",
+            "Se requieren registros repetidos"
+        )
+    else:
+        st.metric(
+            "Cambio promedio de goma",
+            f"{promedio_goma:.1f} días",
+            "Promedio por tulipa"
+        )
+
 st.markdown("---")
 
 # =====================================================
@@ -763,11 +896,10 @@ if df_f.empty:
     st.warning("Sin datos para los filtros seleccionados.")
 
 else:
-    # Primero visible: análisis específico por ubicación física
     if mostrar_grafico_ubicacion:
         st.markdown("## Análisis específico por ubicación física")
         st.caption(
-            "Cada celda representa la frecuencia de mantenciones para una combinación Cabezal × Tulipa."
+            "Cada celda representa la frecuencia de intervenciones para una combinación Cabezal × Tulipa."
         )
 
         st.plotly_chart(
