@@ -91,7 +91,7 @@ GRID = "rgba(128,128,128,0.15)"
 LINE = "rgba(128,128,128,0.30)"
 
 # ============================================================================
-# NORMALIZACIÓN
+# FUNCIONES BASE
 # ============================================================================
 
 def normalizar_formato(val):
@@ -628,45 +628,68 @@ def grafico_tendencia(df):
     tend.columns = ["Fecha", "Registros"]
     tend["Fecha"] = pd.to_datetime(tend["Fecha"])
     tend = tend.sort_values("Fecha")
+    tend["Fecha_txt"] = tend["Fecha"].dt.strftime("%d-%m-%Y")
 
     fig = go.Figure()
 
     fig.add_trace(go.Bar(
-        x=tend["Fecha"],
+        x=tend["Fecha_txt"],
         y=tend["Registros"],
-        name="Registros",
+        name="Registros diarios",
         marker_color="#4a90d9",
-        opacity=0.75,
+        opacity=0.85,
         text=tend["Registros"],
         textposition="outside",
         cliponaxis=False,
-        hovertemplate="<b>%{x|%d-%m-%Y}</b><br>%{y} registros<extra></extra>"
+        hovertemplate="<b>%{x}</b><br>Registros: %{y}<extra></extra>"
     ))
 
-    if len(tend) >= 5:
-        tend["MA7"] = tend["Registros"].rolling(7, min_periods=1, center=True).mean()
+    if len(tend) >= 2:
+        tend["Media móvil 7 días"] = (
+            tend["Registros"]
+            .rolling(7, min_periods=1)
+            .mean()
+        )
 
         fig.add_trace(go.Scatter(
-            x=tend["Fecha"],
-            y=tend["MA7"],
-            name="Promedio 7 días",
-            mode="lines",
-            line=dict(color="#e74c3c", width=2.5),
-            hovertemplate="<b>%{x|%d-%m-%Y}</b><br>Promedio: %{y:.1f}<extra></extra>"
+            x=tend["Fecha_txt"],
+            y=tend["Media móvil 7 días"],
+            name="Media móvil 7 días",
+            mode="lines+markers",
+            line=dict(color="#e74c3c", width=2.5, dash="dot"),
+            marker=dict(size=6),
+            hovertemplate="<b>%{x}</b><br>MA7: %{y:.1f}<extra></extra>"
         ))
 
-    aplicar_estilo_figura(fig, "Tendencia temporal de mantenimientos", 420, t=90, b=90)
+    aplicar_estilo_figura(
+        fig,
+        "Tendencia temporal de registros",
+        height=420,
+        l=70,
+        r=90,
+        t=90,
+        b=95
+    )
+
+    max_y = tend["Registros"].max() if not tend.empty else 1
 
     fig.update_layout(
         xaxis_title="Fecha",
         yaxis_title="Registros",
-        hovermode="x unified",
-        legend=dict(orientation="h", y=1.08, x=0.5, xanchor="center"),
+        showlegend=len(tend) >= 2,
+        bargap=0.35,
         margin=dict(l=70, r=90, t=90, b=95)
     )
 
-    max_y = tend["Registros"].max() if not tend.empty else 1
-    fig.update_yaxes(range=[0, max_y * 1.25])
+    fig.update_yaxes(
+        range=[0, max_y * 1.35 if max_y > 0 else 1],
+        dtick=1 if max_y <= 10 else None
+    )
+
+    fig.update_xaxes(
+        type="category",
+        tickangle=0 if len(tend) <= 6 else -35
+    )
 
     return fig
 
@@ -972,9 +995,6 @@ st.markdown(
             Área de Operaciones · Línea 11<br>
             Análisis Encajonadora / Desencajonadora
         </h1>
-        <p style='font-size:0.9rem; opacity:0.7; margin:0;'>
-            Elaborado por: <b>Enrique Brun</b> &nbsp;|&nbsp; Jefe de Operaciones: <b>Gastón Flores</b>
-        </p>
     </div>
     """,
     unsafe_allow_html=True
@@ -1236,7 +1256,7 @@ else:
         st.markdown("---")
 
     if mostrar_tendencia:
-        st.markdown("## Análisis temporal")
+        st.markdown("## Tendencia temporal")
 
         st.plotly_chart(
             grafico_tendencia(df_f),
