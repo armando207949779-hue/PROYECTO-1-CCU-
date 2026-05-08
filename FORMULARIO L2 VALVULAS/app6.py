@@ -1,4 +1,5 @@
-# App Streamlit: Registro mantenimiento válvulas KRONES Línea 2 - CON LOGO Y FORMATO ACTUALIZADO
+# App Streamlit: Registro mantenimiento válvulas KRONES Línea 2
+# Versión con logo, formato mejorado, margen ajustado y operadores actualizados
 
 import streamlit as st
 import gspread
@@ -42,10 +43,10 @@ TURNOS = ["", "A", "B", "C"]
 
 OPERADORES = [
     "",
-    "RICHARD RUZ",
-    "DIDIMO VALERO",
-    "JORGE GONZALES",
-    "JUAN RUPERTUS MONDACA",
+    "RODRIGO MIRANDA CATALAN",
+    "MARCO QUILAHUEQUE CONTRERAS",
+    "MAURICIO MOYA MAUREIRA",
+    "JOSÉ RICARDO QUILÁN REYES",
     "OTRO"
 ]
 
@@ -58,7 +59,6 @@ REPUESTOS = [
 ]
 
 NUMEROS_VALVULA = list(range(1, 113))
-
 
 # =====================================================
 # GOOGLE SHEETS
@@ -115,9 +115,11 @@ st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 0.5rem;
-        padding-bottom: 1rem;
-        max-width: 1200px;
+        padding-top: 0.8rem;
+        padding-bottom: 1.2rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: 1180px;
     }
 
     h1 {
@@ -136,21 +138,30 @@ st.markdown(
     }
 
     div[data-testid="stCheckbox"] {
-        margin-bottom: -12px;
+        margin-bottom: -10px;
     }
 
     div[data-testid="stCheckbox"] label {
-        font-size: 0.75rem;
+        font-size: 0.78rem;
     }
 
     div[data-testid="stVerticalBlock"] {
         gap: 0.35rem;
     }
 
-    .form-card-title {
-        color: #0E4C92;
-        font-weight: 700;
-        margin-bottom: 0.4rem;
+    .valvula-resumen {
+        background-color: rgba(30, 144, 255, 0.14);
+        color: #1E90FF;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 12px 18px 4px 18px;
+        font-size: 0.95rem;
+    }
+
+    .valvula-lista {
+        padding-left: 18px;
+        padding-right: 18px;
+        margin-top: 6px;
     }
     </style>
     """,
@@ -172,8 +183,8 @@ def mostrar_logo():
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                margin-top: 1.2rem;
-                margin-bottom: 0.8rem;
+                margin-top: 1.4rem;
+                margin-bottom: 2.2rem;
             ">
                 <img
                     src="data:image/png;base64,{logo_base64}"
@@ -199,17 +210,17 @@ mostrar_logo()
 
 st.markdown(
     """
-    <div style='text-align: center; padding: 4px 10px 4px 10px;'>
-        <h1 style='color:#0E4C92; margin-bottom:4px; font-size: 2.1rem;'>
+    <div style='text-align: center; padding: 10px 10px 4px 10px;'>
+        <h1 style='color:#0E4C92; margin-bottom:18px; font-size: 2.1rem;'>
             REGISTRO DE MANTENIMIENTO
         </h1>
         <h2 style='color:#2E86C1; margin-top:0px; font-size: 1.25rem; font-weight: 600;'>
             LÍNEA 2 · VÁLVULAS KRONES
         </h2>
-        <p style='color:#5D6D7E; font-size: 1rem; margin-top: 8px;'>
+        <p style='color:#5D6D7E; font-size: 1rem; margin-top: 18px;'>
             Formulario para registrar mantenciones operacionales de válvulas
         </p>
-        <hr style='border: 1px solid #D6EAF8; width:75%; margin-top: 10px;'>
+        <hr style='border: 1px solid #D6EAF8; width:75%; margin-top: 18px;'>
     </div>
     """,
     unsafe_allow_html=True
@@ -277,21 +288,37 @@ with st.container(border=True):
 
     st.caption("Seleccione una o más válvulas intervenidas.")
 
+    st.markdown(
+        """
+        <div class="valvula-lista">
+        """,
+        unsafe_allow_html=True
+    )
+
     columnas = 14
 
     for inicio in range(1, 113, columnas):
-        cols = st.columns(columnas)
+        cols = st.columns(columnas, gap="small")
 
         for i, num in enumerate(range(inicio, min(inicio + columnas, 113))):
             with cols[i]:
                 st.checkbox(str(num), key=f"val_{num}")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
     valvulas = [
         n for n in NUMEROS_VALVULA
         if st.session_state.get(f"val_{n}", False)
     ]
 
-    st.info(f"Válvulas seleccionadas: {len(valvulas)}")
+    st.markdown(
+        f"""
+        <div class="valvula-resumen">
+            Válvulas seleccionadas: {len(valvulas)}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     if valvulas:
         st.write(valvulas)
@@ -380,7 +407,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Válvulas KRONES Línea 2</b> · v1.1<br>
+        <b>Formulario Mantenimiento Válvulas KRONES Línea 2</b> · v1.2<br>
         Streamlit · Google Sheets
     </div>
     """,
