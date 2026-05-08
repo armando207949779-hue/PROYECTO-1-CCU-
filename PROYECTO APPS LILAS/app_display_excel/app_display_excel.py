@@ -5,10 +5,104 @@ import plotly.express as px
 from io import BytesIO
 import zipfile
 import os
+from pathlib import Path
+import base64
 
-st.set_page_config(page_title="Visor Excel L2", layout="wide")
+# =====================================================
+# CONFIGURACIÓN GENERAL
+# =====================================================
+st.set_page_config(
+    page_title="Visor Excel L2",
+    page_icon="🏭",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("Visor, análisis, fotos e IDs agrupados")
+# =====================================================
+# RUTAS DEL PROYECTO / LOGO
+# =====================================================
+BASE_DIR = Path(__file__).resolve().parent
+
+LOGO_CANDIDATES = [
+    BASE_DIR / "assets" / "CCU_logo_(2018).svg.png",
+    BASE_DIR.parent / "assets" / "CCU_logo_(2018).svg.png",
+]
+
+LOGO_PATH = next(
+    (path for path in LOGO_CANDIDATES if path.exists()),
+    LOGO_CANDIDATES[0]
+)
+
+# =====================================================
+# ESTILO GENERAL
+# =====================================================
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 0.5rem;
+        padding-bottom: 1rem;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 0.2rem;
+        color: #0E4C92;
+        line-height: 1.15;
+    }
+
+    h2 {
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 0.4rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# =====================================================
+# ENCABEZADO CON LOGO
+# =====================================================
+if LOGO_PATH.exists():
+    logo_base64 = base64.b64encode(LOGO_PATH.read_bytes()).decode("utf-8")
+
+    st.markdown(
+        f"""
+        <div style="
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 1.6rem;
+            margin-bottom: 1.1rem;
+        ">
+            <img
+                src="data:image/png;base64,{logo_base64}"
+                style="
+                    width: 210px;
+                    max-width: 70%;
+                    display: block;
+                "
+                alt="Logo CCU"
+            >
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.warning(f"Logo no encontrado: {LOGO_PATH}")
+
+st.markdown(
+    """
+    <div style='text-align:center; margin-bottom:1.6rem;'>
+        <h1 style='margin-top:0;'>
+            Visor, análisis, fotos e IDs agrupados<br>
+            Estándares Visuales LILA
+        </h1>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 archivo = st.file_uploader(
     "Sube tu archivo Excel",
@@ -16,6 +110,9 @@ archivo = st.file_uploader(
 )
 
 
+# =====================================================
+# FUNCIONES
+# =====================================================
 def filtrar_texto(df_base, columna, texto, tipo_filtro):
     if texto is None or str(texto).strip() == "":
         return df_base
@@ -260,6 +357,9 @@ def tabla_valores_originales_simple(df_base, columna):
     return tabla
 
 
+# =====================================================
+# APP PRINCIPAL
+# =====================================================
 if archivo is not None:
     try:
         excel = pd.ExcelFile(archivo, engine="openpyxl")
