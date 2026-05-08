@@ -1,19 +1,43 @@
-# App8 Streamlit Formulario Tulipas Línea 2 - MATRIZ ACTUALIZADA
+# App8 Streamlit Formulario Tulipas Línea 2 - MATRIZ ACTUALIZADA CON LOGO
 
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from pathlib import Path
+import base64
 
+# =====================================================
+# CONFIGURACIÓN GENERAL
+# =====================================================
 st.set_page_config(
     page_title="Formulario Mantenimiento Tulipas Línea 2",
+    page_icon="🏢",
     layout="centered"
 )
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1EjrHHNJXjjBOObeAfIBxQjDfcyCS-o_j4FLaDxOPjRI/edit?usp=sharing"
 ZONA_HORARIA = ZoneInfo("America/Santiago")
 
+# =====================================================
+# RUTAS DEL PROYECTO / LOGO
+# =====================================================
+BASE_DIR = Path(__file__).resolve().parent
+
+LOGO_CANDIDATES = [
+    BASE_DIR / "assets" / "CCU_logo_(2018).svg.png",
+    BASE_DIR.parent / "assets" / "CCU_logo_(2018).svg.png",
+]
+
+LOGO_PATH = next(
+    (path for path in LOGO_CANDIDATES if path.exists()),
+    LOGO_CANDIDATES[0]
+)
+
+# =====================================================
+# LISTAS FORMULARIO
+# =====================================================
 TURNOS = ["", "A", "B", "C"]
 
 OPERADORES = [
@@ -39,7 +63,9 @@ MANTENCIONES = [
     "OTRO"
 ]
 
-
+# =====================================================
+# CONEXIÓN GOOGLE SHEETS
+# =====================================================
 @st.cache_resource(ttl=60)
 def conectar():
     scope = [
@@ -87,9 +113,48 @@ def obtener_hora_chile():
     return datetime.now(ZONA_HORARIA).strftime("%Y-%m-%d %H:%M:%S")
 
 
+# =====================================================
+# FUNCIÓN LOGO
+# =====================================================
+def mostrar_logo():
+    if LOGO_PATH.exists():
+        logo_base64 = base64.b64encode(LOGO_PATH.read_bytes()).decode("utf-8")
+
+        st.markdown(
+            f"""
+            <div style="
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                margin-top: 1.2rem;
+                margin-bottom: 0.8rem;
+            ">
+                <img
+                    src="data:image/png;base64,{logo_base64}"
+                    style="
+                        width: 190px;
+                        max-width: 70%;
+                        display: block;
+                    "
+                    alt="Logo CCU"
+                >
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.warning(f"Logo no encontrado: {LOGO_PATH}")
+
+
+# =====================================================
+# ENCABEZADO
+# =====================================================
+mostrar_logo()
+
 st.markdown(
     """
-    <div style='text-align: center; padding: 12px 10px 4px 10px;'>
+    <div style='text-align: center; padding: 4px 10px 4px 10px;'>
         <h1 style='color:#0E4C92; margin-bottom:4px; font-size: 2.1rem;'>
             FORMULARIO DE MANTENIMIENTO
         </h1>
@@ -107,7 +172,9 @@ st.markdown(
 
 st.info("Complete todos los campos requeridos antes de guardar el registro.")
 
-
+# =====================================================
+# DATOS GENERALES
+# =====================================================
 with st.container(border=True):
     st.subheader("Datos generales")
 
@@ -128,7 +195,9 @@ with st.container(border=True):
 
     formato = st.selectbox("Formato", FORMATOS)
 
-
+# =====================================================
+# SELECCIÓN DE TULIPAS
+# =====================================================
 with st.container(border=True):
     st.subheader("Selección de tulipas")
 
@@ -176,7 +245,9 @@ with st.container(border=True):
         if seleccion_tulipas:
             st.write(seleccion_tulipas)
 
-
+# =====================================================
+# MANTENCIÓN
+# =====================================================
 with st.container(border=True):
     st.subheader("Mantención")
 
@@ -198,7 +269,9 @@ with st.container(border=True):
         placeholder="Escriba observaciones adicionales..."
     )
 
-
+# =====================================================
+# RESUMEN
+# =====================================================
 with st.container(border=True):
     st.subheader("Resumen")
 
@@ -212,7 +285,9 @@ with st.container(border=True):
 
     guardar = st.button("Guardar registro", use_container_width=True)
 
-
+# =====================================================
+# VALIDACIÓN Y GUARDADO
+# =====================================================
 if guardar:
 
     errores = []
@@ -270,12 +345,14 @@ if guardar:
         except Exception as e:
             st.error(f"Error al guardar: {e}")
 
-
+# =====================================================
+# FOOTER
+# =====================================================
 st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Tulipas Línea 2</b> · v8.2<br>
+        <b>Formulario Mantenimiento Tulipas Línea 2</b> · v8.3<br>
         Streamlit · Google Sheets
     </div>
     """,
