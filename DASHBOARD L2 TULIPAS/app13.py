@@ -11,6 +11,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 from datetime import datetime
+from pathlib import Path
+import base64
 import re
 
 # =====================================================
@@ -18,8 +20,25 @@ import re
 # =====================================================
 st.set_page_config(
     page_title="Dashboard Tulipas Línea 2",
+    page_icon="🏢",
     layout="wide",
     initial_sidebar_state="expanded"
+)
+
+# =====================================================
+# RUTAS DEL PROYECTO / LOGO
+# =====================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+
+LOGO_CANDIDATES = [
+    BASE_DIR / "assets" / "CCU_logo_(2018).svg.png",
+    BASE_DIR.parent / "assets" / "CCU_logo_(2018).svg.png",
+]
+
+LOGO_PATH = next(
+    (path for path in LOGO_CANDIDATES if path.exists()),
+    LOGO_CANDIDATES[0]
 )
 
 SHEET_ID = "1EjrHHNJXjjBOObeAfIBxQjDfcyCS-o_j4FLaDxOPjRI"
@@ -35,7 +54,7 @@ st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 2rem;
+        padding-top: 1.2rem;
         padding-bottom: 1rem;
     }
 
@@ -119,7 +138,7 @@ def normalizar_formato(val):
 # =====================================================
 # CARGA DE DATOS
 # =====================================================
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=1)
 def cargar_datos():
     df = pd.read_csv(CSV_URL)
 
@@ -606,8 +625,34 @@ except Exception as e:
     st.stop()
 
 # =====================================================
-# ENCABEZADO
+# ENCABEZADO CON LOGO CCU
 # =====================================================
+
+if LOGO_PATH.exists():
+    logo_base64 = base64.b64encode(LOGO_PATH.read_bytes()).decode("utf-8")
+
+    st.markdown(
+        f"""
+        <div style="
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 0.3rem;
+            margin-bottom: 1.0rem;
+        ">
+            <img
+                src="data:image/png;base64,{logo_base64}"
+                style="width: 260px; max-width: 85%; display: block;"
+                alt="Logo CCU"
+            >
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.warning(f"Logo no encontrado: {LOGO_PATH}")
+
 st.markdown(
     """
     <div style='text-align:center; margin-bottom:1.2rem;'>
@@ -666,6 +711,7 @@ turnos_sel = st.sidebar.multiselect(
 )
 
 operadores_base = df["Operador"].replace("", "SIN OPERADOR")
+
 operadores_sel = st.sidebar.multiselect(
     "Operadores",
     sorted(operadores_base.dropna().unique()),
@@ -722,7 +768,10 @@ with m3:
     st.metric("Operadores", df_f["Operador"].replace("", "SIN OPERADOR").nunique())
 
 with m4:
-    st.metric("Tulipas intervenidas", df_f[["Equipo", "Formato", "Cabezal", "Tulipa"]].drop_duplicates().shape[0])
+    st.metric(
+        "Tulipas intervenidas",
+        df_f[["Equipo", "Formato", "Cabezal", "Tulipa"]].drop_duplicates().shape[0]
+    )
 
 with m5:
     promedio = len(df_f) / max(df_f["Fecha"].nunique(), 1)
