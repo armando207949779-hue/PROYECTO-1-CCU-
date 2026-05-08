@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import re
 import plotly.express as px
+from io import BytesIO
+import zipfile
 
 st.set_page_config(page_title="Visor Excel L2", layout="wide")
 
@@ -62,6 +64,73 @@ def filtrar_texto(df_base, columna, texto, tipo_filtro):
         ]
 
     return df_base
+
+
+def limpiar_nombre_archivo(texto):
+    texto = str(texto).strip()
+    texto = re.sub(r'[\\/*?:"<>|]', "_", texto)
+    texto = re.sub(r"\s+", " ", texto)
+    return texto[:80]
+
+
+def dataframe_a_excel_bytes(df_descarga, nombre_hoja="Datos"):
+    output = BytesIO()
+
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_descarga.to_excel(
+            writer,
+            index=False,
+            sheet_name=nombre_hoja[:31]
+        )
+
+        worksheet = writer.sheets[nombre_hoja[:31]]
+
+        for column_cells in worksheet.columns:
+            max_length = 0
+            column_letter = column_cells[0].column_letter
+
+            for cell in column_cells:
+                try:
+                    valor = str(cell.value) if cell.value is not None else ""
+                    max_length = max(max_length, len(valor))
+                except:
+                    pass
+
+            worksheet.column_dimensions[column_letter].width = min(max_length + 2, 45)
+
+    output.seek(0)
+    return output.getvalue()
+
+
+def crear_zip_por_maquina(df_descarga):
+    zip_buffer = BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        maquinas = (
+            df_descarga["Maquina"]
+            .dropna()
+            .astype(str)
+            .sort_values()
+            .unique()
+        )
+
+        for maquina in maquinas:
+            df_maquina = df_descarga[
+                df_descarga["Maquina"].astype(str) == maquina
+            ]
+
+            nombre_limpio = limpiar_nombre_archivo(maquina)
+            nombre_excel = f"{nombre_limpio}.xlsx"
+
+            excel_bytes = dataframe_a_excel_bytes(
+                df_maquina,
+                nombre_hoja="Datos"
+            )
+
+            zip_file.writestr(nombre_excel, excel_bytes)
+
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue()
 
 
 def filtro_checkboxes_vertical(
@@ -449,22 +518,46 @@ if archivo is not None:
             )
 
             if columnas_visibles:
+                df_descarga = df_filtrado[columnas_visibles].copy()
+
                 st.dataframe(
-                    df_filtrado[columnas_visibles],
+                    df_descarga,
                     use_container_width=True,
                     height=700
                 )
 
-                csv = df_filtrado[columnas_visibles].to_csv(
-                    index=False
-                ).encode("utf-8-sig")
+                st.subheader("Descargas")
 
-                st.download_button(
-                    label="Descargar datos filtrados en CSV",
-                    data=csv,
-                    file_name="datos_filtrados_L2.csv",
-                    mime="text/csv"
-                )
+                col_descarga_1, col_descarga_2 = st.columns(2)
+
+                with col_descarga_1:
+                    excel_completo = dataframe_a_excel_bytes(
+                        df_descarga,
+                        nombre_hoja="Datos filtrados"
+                    )
+
+                    st.download_button(
+                        label="Descargar data filtrada completa en Excel",
+                        data=excel_completo,
+                        file_name="datos_filtrados_completo.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+
+                with col_descarga_2:
+                    if "Maquina" in df_descarga.columns:
+                        zip_maquinas = crear_zip_por_maquina(df_descarga)
+
+                        st.download_button(
+                            label="Descargar Excels separados por máquina",
+                            data=zip_maquinas,
+                            file_name="datos_filtrados_por_maquina.zip",
+                            mime="application/zip"
+                        )
+                    else:
+                        st.warning(
+                            "Para descargar por máquina, la columna 'Maquina' debe estar visible."
+                        )
+
             else:
                 st.warning("Selecciona al menos una columna para mostrar.")
 
