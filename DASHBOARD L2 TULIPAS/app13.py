@@ -68,27 +68,6 @@ st.markdown(
         border-bottom: 2px solid #3498db;
         padding-bottom: 0.4rem;
     }
-
-    div[data-testid="stMetric"] {
-        border-radius: 0.5rem;
-        padding: 0.5rem;
-        border: 1px solid rgba(128,128,128,0.20);
-        min-height: 112px;
-    }
-
-    div[data-testid="stMetric"] label {
-        font-size: 0.88rem;
-    }
-
-    div[data-testid="stMetricValue"] {
-        white-space: normal;
-        overflow-wrap: anywhere;
-        font-size: 2rem;
-    }
-
-    div[data-testid="stMetricDelta"] {
-        white-space: normal;
-    }
     </style>
     """,
     unsafe_allow_html=True
@@ -289,10 +268,10 @@ def tarjeta_kpi(titulo, valor, detalle=None, alerta=False):
         <div style="
             margin-top: 0.55rem;
             color: {color_detalle};
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             line-height: 1.25;
             white-space: normal;
-            word-break: break-word;
+            overflow-wrap: anywhere;
         ">
             {detalle}
         </div>
@@ -303,29 +282,32 @@ def tarjeta_kpi(titulo, valor, detalle=None, alerta=False):
         <div style="
             border: 1px solid {borde};
             background: {fondo};
-            border-radius: 0.55rem;
-            padding: 0.85rem 0.9rem;
-            min-height: 132px;
+            border-radius: 0.6rem;
+            padding: 0.85rem 0.95rem;
+            min-height: 125px;
+            width: 100%;
             overflow: visible;
             margin-bottom: 1rem;
+            box-sizing: border-box;
         ">
             <div style="
-                font-size: 0.92rem;
+                font-size: 0.90rem;
                 font-weight: 700;
-                margin-bottom: 0.45rem;
-                color: inherit;
+                margin-bottom: 0.50rem;
+                line-height: 1.25;
                 white-space: normal;
+                overflow-wrap: anywhere;
             ">
                 {titulo}
             </div>
 
             <div style="
-                font-size: 1.75rem;
-                font-weight: 600;
+                font-size: clamp(1.35rem, 2vw, 2rem);
+                font-weight: 650;
                 line-height: 1.15;
                 white-space: normal;
-                word-break: break-word;
                 overflow-wrap: anywhere;
+                word-break: normal;
             ">
                 {valor}
             </div>
@@ -955,37 +937,57 @@ operador_menos_registros, cantidad_menos_registros = obtener_operador_menos_regi
     operadores_sel
 )
 
-m1, m2, m3, m4, m5 = st.columns(5)
+total_registros = f"{len(df_f):,}"
+dias_con_registros = df_f["Fecha"].nunique()
+operadores_unicos = df_f["Operador"].replace("", "SIN OPERADOR").nunique()
+tulipas_intervenidas = df_f[
+    ["Equipo", "Formato", "Cabezal", "Tulipa"]
+].drop_duplicates().shape[0]
 
-with m1:
-    st.metric("Total registros", f"{len(df_f):,}")
+promedio_registros_dia = len(df_f) / max(df_f["Fecha"].nunique(), 1)
 
-with m2:
-    st.metric("Días con registros", df_f["Fecha"].nunique())
+kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
 
-with m3:
-    st.metric("Operadores", df_f["Operador"].replace("", "SIN OPERADOR").nunique())
-
-with m4:
-    st.metric(
-        "Tulipas intervenidas",
-        df_f[["Equipo", "Formato", "Cabezal", "Tulipa"]].drop_duplicates().shape[0]
+with kpi1:
+    tarjeta_kpi(
+        "Total registros",
+        total_registros
     )
 
-with m5:
-    promedio = len(df_f) / max(df_f["Fecha"].nunique(), 1)
-    st.metric("Registros por día", f"{promedio:.1f}")
+with kpi2:
+    tarjeta_kpi(
+        "Días con registros",
+        dias_con_registros
+    )
 
-k1, k2 = st.columns(2)
+with kpi3:
+    tarjeta_kpi(
+        "Operadores",
+        operadores_unicos
+    )
 
-with k1:
+with kpi4:
+    tarjeta_kpi(
+        "Tulipas intervenidas",
+        tulipas_intervenidas
+    )
+
+with kpi5:
+    tarjeta_kpi(
+        "Registros por día",
+        f"{promedio_registros_dia:.1f}"
+    )
+
+kpi6, kpi7 = st.columns(2)
+
+with kpi6:
     tarjeta_kpi(
         "Último registro",
         ultimo_fecha,
         f"Operador: {ultimo_operador}"
     )
 
-with k2:
+with kpi7:
     tarjeta_kpi(
         "Tulipa más crítica",
         tulipa_critica,
@@ -993,9 +995,9 @@ with k2:
         alerta=True
     )
 
-k3, k4 = st.columns(2)
+kpi8, kpi9 = st.columns(2)
 
-with k3:
+with kpi8:
     if promedio_goma is None:
         tarjeta_kpi(
             "Cambio promedio de goma",
@@ -1009,7 +1011,7 @@ with k3:
             "Promedio por tulipa con registros repetidos"
         )
 
-with k4:
+with kpi9:
     if cantidad_menos_registros == 0:
         tarjeta_kpi(
             "Operador con menos registros",
