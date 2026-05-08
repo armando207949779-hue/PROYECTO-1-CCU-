@@ -306,7 +306,14 @@ def tarjeta_estado_alerta(row):
         icono = "⚠️"
         estado_txt = "Error"
 
-    dias_txt = "N/A" if dias is None else str(int(dias))
+    # Manejo seguro de None, NaN o valores no numéricos
+    if pd.isna(dias):
+        dias_txt = "N/A"
+    else:
+        try:
+            dias_txt = str(int(dias))
+        except Exception:
+            dias_txt = "N/A"
 
     with st.container(border=True):
         c1, c2, c3, c4, c5 = st.columns([0.55, 2.2, 1.1, 1.2, 1.4])
@@ -496,7 +503,10 @@ def pagina_alertas():
 
     # Orden mayor a menor por días sin registro.
     # Los N/A quedan abajo.
-    df_alertas["Orden días"] = df_alertas["Días sin registro"].fillna(-1)
+    df_alertas["Orden días"] = pd.to_numeric(
+        df_alertas["Días sin registro"],
+        errors="coerce"
+    ).fillna(-1)
 
     df_alertas = (
         df_alertas
