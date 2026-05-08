@@ -82,6 +82,35 @@ st.markdown(
 # =====================================================
 # FUNCIONES BASE
 # =====================================================
+def crear_dataframe_vacio():
+    return pd.DataFrame(columns=[
+        "Fecha",
+        "Turno",
+        "Operador",
+        "Válvula",
+        "Mantención",
+        "Observaciones"
+    ])
+
+
+def fig_sin_datos():
+    fig = go.Figure()
+
+    fig.add_annotation(
+        text="Sin datos",
+        showarrow=False,
+        font=dict(size=16)
+    )
+
+    fig.update_layout(
+        height=300,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)"
+    )
+
+    return fig
+
+
 def aplicar_estilo_figura(fig, title, height=350, l=70, r=60, t=65, b=55):
     fig.update_layout(
         title=dict(
@@ -137,7 +166,7 @@ def tarjeta_kpi(titulo, valor, detalle=None, alerta=False):
 
 
 def obtener_ultimo_registro(df):
-    if df.empty:
+    if df.empty or "Fecha" not in df.columns:
         return "Sin datos", "-"
 
     df_tmp = df.copy()
@@ -151,21 +180,23 @@ def obtener_ultimo_registro(df):
     else:
         df_tmp["Fecha_orden"] = df_tmp["Fecha"]
 
+    df_tmp = df_tmp.dropna(subset=["Fecha_orden"])
+
+    if df_tmp.empty:
+        return "Sin datos", "-"
+
     ultimo = df_tmp.sort_values("Fecha_orden").iloc[-1]
 
     fecha = ultimo["Fecha_orden"]
     operador = ultimo["Operador"] if str(ultimo["Operador"]).strip() else "SIN OPERADOR"
 
-    if pd.notna(fecha):
-        fecha_txt = fecha.strftime("%d-%m-%Y %H:%M")
-    else:
-        fecha_txt = "-"
+    fecha_txt = fecha.strftime("%d-%m-%Y %H:%M") if pd.notna(fecha) else "-"
 
     return fecha_txt, operador
 
 
 def obtener_valvula_mas_critica(df):
-    if df.empty:
+    if df.empty or "Válvula" not in df.columns:
         return "Sin datos", 0
 
     conteo = (
@@ -186,6 +217,10 @@ def obtener_valvula_mas_critica(df):
 def obtener_operador_menos_registros(df_filtrado, operadores_disponibles):
     if not operadores_disponibles:
         return "Sin operadores", 0
+
+    if df_filtrado.empty or "Operador" not in df_filtrado.columns:
+        operador = str(operadores_disponibles[0]).strip().upper()
+        return operador, 0
 
     conteo = (
         df_filtrado["Operador"]
@@ -223,13 +258,25 @@ def obtener_operador_menos_registros(df_filtrado, operadores_disponibles):
 # =====================================================
 @st.cache_data(ttl=1)
 def cargar_datos():
-    df = pd.read_csv(CSV_URL)
+    try:
+        df = pd.read_csv(CSV_URL)
+    except Exception:
+        return crear_dataframe_vacio()
+
+    df.columns = [str(c).strip() for c in df.columns]
 
     rename_cols = {
         "Número Válvula": "Válvula",
+        "Número válvula": "Válvula",
+        "Numero Válvula": "Válvula",
+        "Numero Valvula": "Válvula",
+        "N° Válvula": "Válvula",
+        "N° Valvula": "Válvula",
         "Repuesto": "Mantención",
         "Repuesto / Mantención": "Mantención",
-        "Fecha Registro": "Fecha registro"
+        "Repuesto / Mantencion": "Mantención",
+        "Fecha Registro": "Fecha registro",
+        "Fecha registro": "Fecha registro"
     }
 
     df = df.rename(columns={c: rename_cols[c] for c in df.columns if c in rename_cols})
@@ -253,13 +300,30 @@ def cargar_datos():
 
     if "Fecha registro" in df.columns:
         df["Fecha registro"] = pd.to_datetime(df["Fecha registro"], errors="coerce")
+        df["Fecha"] = df["Fecha"].fillna(df["Fecha registro"])
 
-    df["Turno"] = df["Turno"].astype(str).str.strip().str.upper()
+    df["Turno"] = df["Turno"].fillna("").astype(str).str.strip().str.upper()
     df["Operador"] = df["Operador"].fillna("").astype(str).str.strip().str.upper()
     df["Mantención"] = df["Mantención"].fillna("").astype(str).str.strip().str.upper()
     df["Observaciones"] = df["Observaciones"].fillna("").astype(str).str.strip()
 
-    df = df.dropna(subset=["Fecha", "Válvula"])
+    df = df.dropna(subset=["Fecha", "Válvula"]).copy()
+
+    if df.empty:
+        columnas_finales = [
+            "Fecha",
+            "Turno",
+            "Operador",
+            "Válvula",
+            "Mantención",
+            "Observaciones"
+        ]
+
+        if "Fecha registro" in df.columns:
+            columnas_finales.append("Fecha registro")
+
+        return pd.DataFrame(columns=columnas_finales)
+
     df["Válvula"] = df["Válvula"].astype(int)
 
     df = df[df["Válvula"].between(1, 112)].copy()
@@ -283,12 +347,15 @@ def cargar_datos():
 # GRÁFICOS
 # =====================================================
 def grafico_estado_valvulas(df):
-    conteos = (
-        df["Válvula"]
-        .value_counts()
-        .reindex(VALVULAS_TODAS, fill_value=0)
-        .sort_index()
-    )
+    if df.empty or "Válvula" not in df.columns:
+        conteos = pd.Series(0, index=VALVULAS_TODAS)
+    else:
+        conteos = (
+            df["Válvula"]
+            .value_counts()
+            .reindex(VALVULAS_TODAS, fill_value=0)
+            .sort_index()
+        )
 
     colores = [
         "#27ae60" if c == 0 else "#f39c12" if c <= 2 else "#e74c3c"
@@ -321,7 +388,15 @@ def grafico_estado_valvulas(df):
 
 
 def grafico_tendencia_temporal(df):
+    if df.empty or "Fecha" not in df.columns:
+        return fig_sin_datos()
+
     df_tmp = df.copy()
+    df_tmp = df_tmp.dropna(subset=["Fecha"])
+
+    if df_tmp.empty:
+        return fig_sin_datos()
+
     df_tmp["Fecha_dia"] = df_tmp["Fecha"].dt.date
 
     tend = (
@@ -332,55 +407,74 @@ def grafico_tendencia_temporal(df):
 
     tend["Fecha_dia"] = pd.to_datetime(tend["Fecha_dia"])
     tend = tend.sort_values("Fecha_dia")
-    tend["Media móvil 7 días"] = tend["Registros"].rolling(7, min_periods=1).mean()
+    tend["Fecha_txt"] = tend["Fecha_dia"].dt.strftime("%d-%m-%Y")
 
     fig = go.Figure()
 
-    fig.add_trace(go.Scatter(
-        x=tend["Fecha_dia"],
+    fig.add_trace(go.Bar(
+        x=tend["Fecha_txt"],
         y=tend["Registros"],
-        mode="lines+markers",
         name="Registros diarios",
-        line=dict(color="#1e88e5", width=1.5),
-        fill="tozeroy",
-        fillcolor="rgba(30,136,229,0.10)",
-        hovertemplate="<b>%{x|%d-%m-%Y}</b><br>Registros: %{y}<extra></extra>"
+        marker_color="#1e88e5",
+        opacity=0.85,
+        text=tend["Registros"],
+        textposition="outside",
+        cliponaxis=False,
+        hovertemplate="<b>%{x}</b><br>Registros: %{y}<extra></extra>"
     ))
 
-    fig.add_trace(go.Scatter(
-        x=tend["Fecha_dia"],
-        y=tend["Media móvil 7 días"].round(1),
-        mode="lines",
-        name="Media móvil 7 días",
-        line=dict(color="#e53935", width=2, dash="dot"),
-        hovertemplate="<b>%{x|%d-%m-%Y}</b><br>MA7: %{y:.1f}<extra></extra>"
-    ))
+    if len(tend) >= 2:
+        tend["Media móvil 7 días"] = (
+            tend["Registros"]
+            .rolling(7, min_periods=1)
+            .mean()
+        )
 
-    aplicar_estilo_figura(fig, "Tendencia temporal de registros", 380)
+        fig.add_trace(go.Scatter(
+            x=tend["Fecha_txt"],
+            y=tend["Media móvil 7 días"],
+            name="Media móvil 7 días",
+            mode="lines+markers",
+            line=dict(color="#e53935", width=2, dash="dot"),
+            hovertemplate="<b>%{x}</b><br>MA7: %{y:.1f}<extra></extra>"
+        ))
+
+    aplicar_estilo_figura(fig, "Tendencia temporal de registros", 400, t=90, b=95)
+
+    max_y = tend["Registros"].max() if not tend.empty else 1
 
     fig.update_layout(
         xaxis_title="Fecha",
         yaxis_title="Registros",
-        margin=dict(l=70, r=80, t=85, b=75),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
+        showlegend=len(tend) >= 2,
+        bargap=0.35,
+        margin=dict(l=70, r=90, t=90, b=100)
+    )
+
+    fig.update_xaxes(
+        type="category",
+        tickangle=0 if len(tend) <= 6 else -35
+    )
+
+    fig.update_yaxes(
+        range=[0, max_y * 1.35 if max_y > 0 else 1],
+        dtick=1 if max_y <= 10 else None
     )
 
     return fig
 
 
 def grafico_por_turno(df):
-    vc = df["Turno"].value_counts().reset_index()
+    if df.empty or "Turno" not in df.columns:
+        return fig_sin_datos()
+
+    vc = df["Turno"].replace("", "SIN TURNO").value_counts().reset_index()
     vc.columns = ["Turno", "Cantidad"]
     vc = vc.sort_values("Turno")
 
     detalle_operadores = (
         df.assign(Operador=df["Operador"].replace("", "SIN OPERADOR"))
+        .assign(Turno=df["Turno"].replace("", "SIN TURNO"))
         .groupby(["Turno", "Operador"])
         .size()
         .reset_index(name="Registros")
@@ -434,6 +528,9 @@ def grafico_por_turno(df):
 
 
 def grafico_por_operador(df):
+    if df.empty or "Operador" not in df.columns:
+        return fig_sin_datos()
+
     op = (
         df["Operador"]
         .replace("", "SIN OPERADOR")
@@ -473,7 +570,10 @@ def grafico_por_operador(df):
 
 
 def grafico_por_mantencion(df):
-    mt = df["Mantención"].value_counts().reset_index()
+    if df.empty or "Mantención" not in df.columns:
+        return fig_sin_datos()
+
+    mt = df["Mantención"].replace("", "SIN MANTENCIÓN").value_counts().reset_index()
     mt.columns = ["Mantención", "Cantidad"]
     mt = mt.sort_values("Cantidad", ascending=False)
 
@@ -510,11 +610,17 @@ def grafico_por_mantencion(df):
 
 
 def grafico_valvula_mantencion_burbujas(df):
+    if df.empty or "Válvula" not in df.columns or "Mantención" not in df.columns:
+        return fig_sin_datos()
+
     bubble = (
         df.groupby(["Válvula", "Mantención"])
         .size()
         .reset_index(name="Cantidad")
     )
+
+    if bubble.empty:
+        return fig_sin_datos()
 
     fig = go.Figure()
 
@@ -557,7 +663,7 @@ try:
     df = cargar_datos()
 except Exception as e:
     st.error(f"No se pudieron cargar los datos desde Google Sheets: {e}")
-    st.stop()
+    df = crear_dataframe_vacio()
 
 # =====================================================
 # ENCABEZADO CON LOGO CCU
@@ -613,41 +719,84 @@ if st.sidebar.button("Actualizar datos"):
     st.cache_data.clear()
     st.rerun()
 
-fecha_min = df["Fecha"].min()
-fecha_max = df["Fecha"].max()
-
-fecha_inicio = st.sidebar.date_input(
-    "Desde",
-    value=fecha_min.date(),
-    min_value=fecha_min.date(),
-    max_value=fecha_max.date()
+fechas_validas = (
+    df["Fecha"].dropna()
+    if "Fecha" in df.columns
+    else pd.Series(dtype="datetime64[ns]")
 )
 
-fecha_fin = st.sidebar.date_input(
-    "Hasta",
-    value=fecha_max.date(),
-    min_value=fecha_min.date(),
-    max_value=fecha_max.date()
+if fechas_validas.empty:
+    hoy = datetime.now().date()
+
+    st.sidebar.warning("No hay fechas válidas disponibles.")
+
+    fecha_inicio = st.sidebar.date_input(
+        "Desde",
+        value=hoy
+    )
+
+    fecha_fin = st.sidebar.date_input(
+        "Hasta",
+        value=hoy
+    )
+else:
+    fecha_min = fechas_validas.min()
+    fecha_max = fechas_validas.max()
+
+    fecha_inicio = st.sidebar.date_input(
+        "Desde",
+        value=fecha_min.date(),
+        min_value=fecha_min.date(),
+        max_value=fecha_max.date()
+    )
+
+    fecha_fin = st.sidebar.date_input(
+        "Hasta",
+        value=fecha_max.date(),
+        min_value=fecha_min.date(),
+        max_value=fecha_max.date()
+    )
+
+turnos_opciones = (
+    sorted(df["Turno"].dropna().unique())
+    if "Turno" in df.columns and not df.empty
+    else []
+)
+
+operadores_base = (
+    df["Operador"].replace("", "SIN OPERADOR")
+    if "Operador" in df.columns
+    else pd.Series(dtype=str)
+)
+
+operadores_opciones = (
+    sorted(operadores_base.dropna().unique())
+    if not operadores_base.empty
+    else []
+)
+
+mantencion_opciones = (
+    sorted(df["Mantención"].dropna().unique())
+    if "Mantención" in df.columns and not df.empty
+    else []
 )
 
 turnos_sel = st.sidebar.multiselect(
     "Turnos",
-    sorted(df["Turno"].dropna().unique()),
-    default=sorted(df["Turno"].dropna().unique())
+    turnos_opciones,
+    default=turnos_opciones
 )
-
-operadores_base = df["Operador"].replace("", "SIN OPERADOR")
 
 operadores_sel = st.sidebar.multiselect(
     "Operadores",
-    sorted(operadores_base.dropna().unique()),
-    default=sorted(operadores_base.dropna().unique())
+    operadores_opciones,
+    default=operadores_opciones
 )
 
 mantencion_sel = st.sidebar.multiselect(
     "Tipos de mantención",
-    sorted(df["Mantención"].dropna().unique()),
-    default=sorted(df["Mantención"].dropna().unique())
+    mantencion_opciones,
+    default=mantencion_opciones
 )
 
 valvulas_sel = st.sidebar.multiselect(
@@ -697,14 +846,17 @@ mostrar_datos_detallados = st.sidebar.checkbox(
 # =====================================================
 # FILTRO DATAFRAME
 # =====================================================
-df_f = df[
-    (df["Fecha"].dt.date >= fecha_inicio) &
-    (df["Fecha"].dt.date <= fecha_fin) &
-    (df["Turno"].isin(turnos_sel)) &
-    (operadores_base.isin(operadores_sel)) &
-    (df["Mantención"].isin(mantencion_sel)) &
-    (df["Válvula"].isin(valvulas_sel))
-].copy()
+if df.empty or fechas_validas.empty:
+    df_f = df.copy()
+else:
+    df_f = df[
+        (df["Fecha"].dt.date >= fecha_inicio) &
+        (df["Fecha"].dt.date <= fecha_fin) &
+        (df["Turno"].isin(turnos_sel)) &
+        (operadores_base.isin(operadores_sel)) &
+        (df["Mantención"].isin(mantencion_sel)) &
+        (df["Válvula"].isin(valvulas_sel))
+    ].copy()
 
 # =====================================================
 # KPIS
@@ -720,10 +872,18 @@ operador_menos_registros, cantidad_menos_registros = obtener_operador_menos_regi
 )
 
 total_registros = f"{len(df_f):,}"
-dias_con_registros = df_f["Fecha"].nunique()
-operadores_unicos = df_f["Operador"].replace("", "SIN OPERADOR").nunique()
-valvulas_intervenidas = df_f["Válvula"].nunique()
-promedio_registros_dia = len(df_f) / max(df_f["Fecha"].nunique(), 1)
+dias_con_registros = df_f["Fecha"].nunique() if "Fecha" in df_f.columns and not df_f.empty else 0
+operadores_unicos = (
+    df_f["Operador"].replace("", "SIN OPERADOR").nunique()
+    if "Operador" in df_f.columns and not df_f.empty
+    else 0
+)
+valvulas_intervenidas = (
+    df_f["Válvula"].nunique()
+    if "Válvula" in df_f.columns and not df_f.empty
+    else 0
+)
+promedio_registros_dia = len(df_f) / max(dias_con_registros, 1)
 
 kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
 
@@ -762,7 +922,7 @@ with kpi7:
 kpi8, kpi9 = st.columns(2)
 
 with kpi8:
-    valvulas_sin_registro = len(set(valvulas_sel)) - df_f["Válvula"].nunique()
+    valvulas_sin_registro = len(set(valvulas_sel)) - valvulas_intervenidas
 
     tarjeta_kpi(
         "Válvulas sin registro",
@@ -793,6 +953,19 @@ st.markdown("---")
 if df_f.empty:
     st.warning("Sin datos para los filtros seleccionados.")
 
+    if mostrar_estado_global:
+        st.markdown("## Estado global de válvulas")
+        st.caption(
+            "Criterio visual: verde = sin registros, naranjo = 1 a 2 registros, rojo = 3 o más registros."
+        )
+
+        st.plotly_chart(
+            grafico_estado_valvulas(df_f),
+            use_container_width=True
+        )
+
+        st.markdown("---")
+
 else:
     if mostrar_estado_global:
         st.markdown("## Estado global de válvulas")
@@ -808,7 +981,7 @@ else:
         st.markdown("---")
 
     if mostrar_tendencia:
-        st.markdown("## Análisis temporal")
+        st.markdown("## Tendencia temporal")
 
         st.plotly_chart(
             grafico_tendencia_temporal(df_f),
@@ -856,9 +1029,15 @@ else:
 
         st.markdown("---")
 
-    if mostrar_datos_detallados:
-        st.markdown("## Datos detallados")
+# =====================================================
+# DATOS DETALLADOS
+# =====================================================
+if mostrar_datos_detallados:
+    st.markdown("## Datos detallados")
 
+    if df_f.empty:
+        st.info("No hay registros para mostrar.")
+    else:
         df_show = df_f.copy()
         df_show["Fecha"] = df_show["Fecha"].dt.strftime("%d-%m-%Y")
 
@@ -879,7 +1058,7 @@ else:
         st.download_button(
             "Descargar datos filtrados",
             df_show.to_csv(index=False).encode("utf-8-sig"),
-            file_name=f"datos_valvulas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            file_name=f"datos_valvulas_L2_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
         )
 
@@ -889,13 +1068,19 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.markdown("### Fuente de datos")
 
-fmt_min = df["Fecha"].min().strftime("%d-%m-%Y") if pd.notna(df["Fecha"].min()) else "N/A"
-fmt_max = df["Fecha"].max().strftime("%d-%m-%Y") if pd.notna(df["Fecha"].max()) else "N/A"
+if "Fecha" in df.columns and not df["Fecha"].dropna().empty:
+    fmt_min = df["Fecha"].dropna().min().strftime("%d-%m-%Y")
+    fmt_max = df["Fecha"].dropna().max().strftime("%d-%m-%Y")
+else:
+    fmt_min = "Sin datos"
+    fmt_max = "Sin datos"
 
 st.sidebar.info(
     f"Google Sheets\n\n"
     f"- {len(df):,} registros totales\n"
-    f"- Período: {fmt_min} → {fmt_max}"
+    f"- Período: {fmt_min} → {fmt_max}\n"
+    f"- Línea: 2\n"
+    f"- Válvulas monitoreadas: 112"
 )
 
 # =====================================================
@@ -905,7 +1090,7 @@ st.markdown("---")
 st.markdown(
     f"""
     <div style='text-align:center; opacity:0.6; font-size:0.8rem;'>
-        Dashboard conectado a Google Sheets · Streamlit + Plotly · 
+        Dashboard conectado a Google Sheets · Streamlit + Plotly · Línea 2 ·
         {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}
     </div>
     """,
