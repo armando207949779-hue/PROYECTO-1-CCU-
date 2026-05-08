@@ -1,7 +1,7 @@
 """
 Dashboard de Mantenimiento de Tulipas - Línea 2
 Conectado al formulario Streamlit y Google Sheets.
-Versión mejorada con estructura tipo dashboard de válvulas.
+Dashboard Área de Operaciones - Análisis Encajonadora/Desencajonadora.
 """
 
 import streamlit as st
@@ -19,7 +19,7 @@ import re
 # CONFIGURACIÓN GENERAL
 # =====================================================
 st.set_page_config(
-    page_title="Dashboard Tulipas Línea 2",
+    page_title="Área de Operaciones Línea 2",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -62,6 +62,7 @@ st.markdown(
         text-align: center;
         margin-bottom: 0.2rem;
         color: #0E4C92;
+        line-height: 1.15;
     }
 
     h2 {
@@ -360,28 +361,6 @@ def grafico_equipos_formatos(df):
     return fig
 
 
-def grafico_turno_operador(df):
-    pivot = df.pivot_table(
-        index="Turno",
-        columns="Operador",
-        aggfunc="size",
-        fill_value=0
-    )
-
-    fig = go.Figure(data=go.Heatmap(
-        z=pivot.values,
-        x=pivot.columns,
-        y=pivot.index,
-        colorscale="Blues",
-        colorbar=dict(title="Registros"),
-        hovertemplate="<b>Turno %{y}</b><br><b>%{x}</b><br>Registros: %{z}<extra></extra>"
-    ))
-
-    aplicar_estilo_figura(fig, "Heatmap: turno × operador", 360)
-
-    return fig
-
-
 def crear_heatmaps_tulipas(df):
     configs = [
         ("Desencajonadora", "2000 CC"),
@@ -517,8 +496,8 @@ def crear_heatmaps_tulipas(df):
 
     fig.update_layout(
         title=dict(
-            text="<b>Mapa de calor: cabezal × tulipa</b>",
-            font=dict(size=15, color="#1a237e"),
+            text="<b>Análisis específico por ubicación física</b>",
+            font=dict(size=16, color="#1a237e"),
             x=0.5
         ),
         height=850,
@@ -566,55 +545,6 @@ def grafico_top_tulipas(df, top_n=15):
     return fig
 
 
-def crear_tabla_resumen_tulipas(df):
-    resumen = []
-
-    for equipo in sorted(df["Equipo"].dropna().unique()):
-        for formato in sorted(df["Formato"].dropna().unique()):
-            if formato not in GEOMETRIA:
-                continue
-
-            n_cabezales = GEOMETRIA[formato]["n_cabezales"]
-            n_tulipas = GEOMETRIA[formato]["n_tulipas"]
-
-            for cab in range(1, n_cabezales + 1):
-                for tul in range(1, n_tulipas + 1):
-                    subset = df[
-                        (df["Equipo"] == equipo) &
-                        (df["Formato"] == formato) &
-                        (df["Cabezal"] == cab) &
-                        (df["Tulipa"] == tul)
-                    ]
-
-                    if subset.empty:
-                        resumen.append({
-                            "Equipo": equipo,
-                            "Formato": formato,
-                            "Cabezal": cab,
-                            "Tulipa": tul,
-                            "Total": 0,
-                            "Tipos": "SIN REGISTRO",
-                            "Último registro": "-",
-                            "Último operador": "-"
-                        })
-                    else:
-                        subset = subset.sort_values("Fecha")
-                        ultimo = subset.iloc[-1]
-
-                        resumen.append({
-                            "Equipo": equipo,
-                            "Formato": formato,
-                            "Cabezal": cab,
-                            "Tulipa": tul,
-                            "Total": len(subset),
-                            "Tipos": ", ".join(sorted(subset["Mantención"].dropna().unique())),
-                            "Último registro": ultimo["Fecha"].strftime("%d-%m-%Y"),
-                            "Último operador": ultimo["Operador"]
-                        })
-
-    return pd.DataFrame(resumen)
-
-
 # =====================================================
 # CARGA
 # =====================================================
@@ -660,10 +590,10 @@ else:
 st.markdown(
     """
     <div style='text-align:center; margin-bottom:1.6rem;'>
-        <h1 style='margin-top:0;'>Dashboard Mantenimiento Tulipas · Línea 2</h1>
-        <p style='color:#5D6D7E; margin-top:0.4rem;'>
-            Embotelladora CCU · Monitoreo de mantenimiento por cabezal y tulipa
-        </p>
+        <h1 style='margin-top:0;'>
+            Área de Operaciones · Línea 2<br>
+            Análisis Encajonadora / Desencajonadora
+        </h1>
     </div>
     """,
     unsafe_allow_html=True
@@ -740,6 +670,49 @@ tulipas_sel = st.sidebar.multiselect(
     default=list(range(1, 10))
 )
 
+st.sidebar.markdown("---")
+st.sidebar.markdown("## Gráficos disponibles")
+
+mostrar_grafico_ubicacion = st.sidebar.checkbox(
+    "Análisis por ubicación física",
+    value=True
+)
+
+mostrar_grafico_top_tulipas = st.sidebar.checkbox(
+    "Top tulipas más intervenidas",
+    value=True
+)
+
+mostrar_grafico_tendencia = st.sidebar.checkbox(
+    "Tendencia temporal",
+    value=True
+)
+
+mostrar_grafico_turno = st.sidebar.checkbox(
+    "Registros por turno",
+    value=True
+)
+
+mostrar_grafico_operador = st.sidebar.checkbox(
+    "Top operadores",
+    value=True
+)
+
+mostrar_grafico_equipo_formato = st.sidebar.checkbox(
+    "Registros por equipo y formato",
+    value=True
+)
+
+mostrar_grafico_mantencion = st.sidebar.checkbox(
+    "Tipos de mantención",
+    value=True
+)
+
+mostrar_datos_detallados = st.sidebar.checkbox(
+    "Mostrar datos detallados",
+    value=True
+)
+
 # =====================================================
 # FILTRO
 # =====================================================
@@ -790,71 +763,76 @@ if df_f.empty:
     st.warning("Sin datos para los filtros seleccionados.")
 
 else:
-    st.markdown("## Nivel 1: Análisis general")
+    # Primero visible: análisis específico por ubicación física
+    if mostrar_grafico_ubicacion:
+        st.markdown("## Análisis específico por ubicación física")
+        st.caption(
+            "Cada celda representa la frecuencia de mantenciones para una combinación Cabezal × Tulipa."
+        )
 
-    st.plotly_chart(
-        grafico_tendencia_temporal(df_f),
-        use_container_width=True
-    )
+        st.plotly_chart(
+            crear_heatmaps_tulipas(df_f),
+            use_container_width=True
+        )
 
-    col1, col2, col3 = st.columns(3)
+        st.markdown("---")
 
-    with col1:
-        st.plotly_chart(grafico_por_turno(df_f), use_container_width=True)
+    if mostrar_grafico_top_tulipas:
+        st.plotly_chart(
+            grafico_top_tulipas(df_f),
+            use_container_width=True
+        )
 
-    with col2:
-        st.plotly_chart(grafico_por_operador(df_f), use_container_width=True)
+        st.markdown("---")
 
-    with col3:
-        st.plotly_chart(grafico_equipos_formatos(df_f), use_container_width=True)
+    if mostrar_grafico_tendencia:
+        st.markdown("## Análisis temporal")
 
-    st.markdown("---")
+        st.plotly_chart(
+            grafico_tendencia_temporal(df_f),
+            use_container_width=True
+        )
 
-    st.markdown("## Nivel 2: Análisis operativo")
+        st.markdown("---")
 
-    col1, col2 = st.columns(2)
+    graficos_generales = [
+        mostrar_grafico_turno,
+        mostrar_grafico_operador,
+        mostrar_grafico_equipo_formato
+    ]
 
-    with col1:
-        st.plotly_chart(grafico_por_mantencion(df_f), use_container_width=True)
+    if any(graficos_generales):
+        st.markdown("## Análisis general")
 
-    with col2:
-        st.plotly_chart(grafico_turno_operador(df_f), use_container_width=True)
+        columnas = st.columns(3)
 
-    st.markdown("---")
+        if mostrar_grafico_turno:
+            with columnas[0]:
+                st.plotly_chart(grafico_por_turno(df_f), use_container_width=True)
 
-    st.markdown("## Nivel 3: Análisis específico por ubicación física")
+        if mostrar_grafico_operador:
+            with columnas[1]:
+                st.plotly_chart(grafico_por_operador(df_f), use_container_width=True)
 
-    st.caption(
-        "Cada celda representa la frecuencia de mantenciones para una combinación Cabezal × Tulipa."
-    )
+        if mostrar_grafico_equipo_formato:
+            with columnas[2]:
+                st.plotly_chart(grafico_equipos_formatos(df_f), use_container_width=True)
 
-    st.plotly_chart(
-        crear_heatmaps_tulipas(df_f),
-        use_container_width=True
-    )
+        st.markdown("---")
 
-    st.plotly_chart(
-        grafico_top_tulipas(df_f),
-        use_container_width=True
-    )
+    if mostrar_grafico_mantencion:
+        st.markdown("## Análisis de mantenciones")
 
-    st.markdown("### Tabla resumen por tulipa")
+        st.plotly_chart(
+            grafico_por_mantencion(df_f),
+            use_container_width=True
+        )
 
-    df_resumen = crear_tabla_resumen_tulipas(df_f)
+        st.markdown("---")
 
-    st.dataframe(
-        df_resumen,
-        use_container_width=True,
-        height=420
-    )
+    if mostrar_datos_detallados:
+        st.markdown("## Datos detallados")
 
-    st.markdown("---")
-
-    st.markdown("## Datos detallados")
-
-    mostrar_tabla = st.checkbox("Mostrar tabla completa de registros")
-
-    if mostrar_tabla:
         df_show = df_f.copy()
         df_show["Fecha"] = df_show["Fecha"].dt.strftime("%d-%m-%Y")
 
@@ -870,25 +848,11 @@ else:
             height=500
         )
 
-    st.markdown("### Descargas")
-
-    col_d1, col_d2 = st.columns(2)
-
-    with col_d1:
-        st.download_button(
-            "Descargar resumen de tulipas",
-            df_resumen.to_csv(index=False).encode("utf-8-sig"),
-            file_name=f"resumen_tulipas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
-
-    with col_d2:
-        df_dl = df_f.copy()
-        df_dl["Fecha"] = df_dl["Fecha"].dt.strftime("%d-%m-%Y")
+        st.markdown("### Descarga")
 
         st.download_button(
             "Descargar datos filtrados",
-            df_dl.to_csv(index=False).encode("utf-8-sig"),
+            df_show.to_csv(index=False).encode("utf-8-sig"),
             file_name=f"datos_tulipas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
         )
