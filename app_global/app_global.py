@@ -1,7 +1,7 @@
 """
 Portal Global CCU
 App principal para navegar entre dashboards y formularios de Línea 2 y Línea 11.
-Incluye pestaña de alertas por falta de registros recientes y descarga PDF.
+Incluye pestaña compacta de alertas por falta de registros recientes y descarga PDF.
 
 Ubicación:
 PROYECTO-1-CCU-/
@@ -92,8 +92,14 @@ st.markdown(
     """
     <style>
     .block-container {
+        padding-top: 1.6rem !important;
+        padding-bottom: 1.4rem !important;
+        padding-left: 2.2rem !important;
+        padding-right: 2.2rem !important;
+    }
+
+    section[data-testid="stSidebar"] {
         padding-top: 0.5rem;
-        padding-bottom: 1rem;
     }
 
     h1 {
@@ -105,6 +111,129 @@ st.markdown(
     h2 {
         border-bottom: 2px solid #3498db;
         padding-bottom: 0.4rem;
+    }
+
+    .portal-logo {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 1.2rem;
+        margin-bottom: 1.2rem;
+    }
+
+    .portal-logo img {
+        width: 220px;
+        max-width: 70%;
+        display: block;
+    }
+
+    .portal-header {
+        text-align: center;
+        margin-bottom: 1.4rem;
+    }
+
+    .portal-header h1 {
+        margin-top: 0;
+        margin-bottom: 0.45rem;
+    }
+
+    .portal-header p {
+        font-size: 17px;
+        opacity: 0.75;
+        margin-top: 0.3rem;
+    }
+
+    .alert-main-ok {
+        background: #dcfce7;
+        border: 1px solid #86efac;
+        border-radius: 14px;
+        padding: 18px 20px;
+        text-align: center;
+        color: #14532d;
+    }
+
+    .alert-main-warning {
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        border-radius: 14px;
+        padding: 18px 20px;
+        text-align: center;
+        color: #7f1d1d;
+    }
+
+    .alert-main-error {
+        background: #fef3c7;
+        border: 1px solid #fcd34d;
+        border-radius: 14px;
+        padding: 18px 20px;
+        text-align: center;
+        color: #78350f;
+    }
+
+    .alert-title {
+        font-size: 1.45rem;
+        font-weight: 800;
+        margin-bottom: 4px;
+    }
+
+    .alert-subtitle {
+        font-size: 0.95rem;
+        opacity: 0.85;
+    }
+
+    .mini-card {
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        padding: 14px 16px;
+        background: rgba(255,255,255,0.65);
+    }
+
+    .mini-card-title {
+        font-size: 0.8rem;
+        opacity: 0.75;
+        margin-bottom: 4px;
+    }
+
+    .mini-card-value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
+    .line-card-ok {
+        border-left: 6px solid #22c55e;
+        background: #f0fdf4;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+    }
+
+    .line-card-alert {
+        border-left: 6px solid #ef4444;
+        background: #fef2f2;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+    }
+
+    .line-card-error {
+        border-left: 6px solid #f59e0b;
+        background: #fffbeb;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+    }
+
+    .line-title {
+        font-weight: 800;
+        font-size: 1.05rem;
+        margin-bottom: 4px;
+    }
+
+    .line-detail {
+        font-size: 0.92rem;
+        opacity: 0.85;
     }
     </style>
     """,
@@ -124,21 +253,9 @@ def mostrar_logo_centrado():
 
         st.markdown(
             f"""
-            <div style="
-                width: 100%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                margin-top: 2.2rem;
-                margin-bottom: 1.4rem;
-            ">
+            <div class="portal-logo">
                 <img
                     src="data:image/png;base64,{logo_base64}"
-                    style="
-                        width: 230px;
-                        max-width: 75%;
-                        display: block;
-                    "
                     alt="Logo CCU"
                 >
             </div>
@@ -333,7 +450,57 @@ def tarjeta_resumen(titulo, valor, icono=None):
             st.markdown(f"### {valor}")
 
 
-def tarjeta_estado_alerta(row):
+def tarjeta_alerta_compacta_linea(nombre_linea, df_linea):
+    total = len(df_linea)
+    alertas = int((df_linea["Estado"] == "ALERTA").sum())
+    errores = int((df_linea["Estado"] == "ERROR").sum())
+    ok = int((df_linea["Estado"] == "OK").sum())
+
+    peor = df_linea.copy()
+    peor["Días sin registro"] = pd.to_numeric(
+        peor["Días sin registro"],
+        errors="coerce"
+    )
+
+    peor = peor.sort_values("Días sin registro", ascending=False, na_position="last")
+
+    if not peor.empty:
+        peor_row = peor.iloc[0]
+        peor_dashboard = peor_row["Dashboard"]
+        peor_dias = peor_row["Días sin registro"]
+
+        if pd.isna(peor_dias):
+            peor_txt = f"{peor_dashboard}: sin fecha válida"
+        else:
+            peor_txt = f"{peor_dashboard}: {int(peor_dias)} días sin registro"
+    else:
+        peor_txt = "Sin datos"
+
+    if alertas > 0:
+        clase = "line-card-alert"
+        estado_txt = f"🚨 {alertas} alerta(s)"
+    elif errores > 0:
+        clase = "line-card-error"
+        estado_txt = f"⚠️ {errores} error(es)"
+    else:
+        clase = "line-card-ok"
+        estado_txt = "✅ Al día"
+
+    st.markdown(
+        f"""
+        <div class="{clase}">
+            <div class="line-title">{nombre_linea} · {estado_txt}</div>
+            <div class="line-detail">
+                OK: {ok} · Alertas: {alertas} · Errores: {errores} · Total: {total}<br>
+                Mayor atención: {peor_txt}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def tarjeta_estado_alerta_detalle(row):
     estado = row["Estado"]
     dashboard = row["Dashboard"]
     linea = row["Línea"]
@@ -364,7 +531,7 @@ def tarjeta_estado_alerta(row):
             dias_txt = "N/A"
 
     with st.container(border=True):
-        c1, c2, c3, c4, c5 = st.columns([0.45, 2.0, 1.0, 1.0, 2.0])
+        c1, c2, c3, c4 = st.columns([0.5, 2.2, 1.1, 2.5])
 
         with c1:
             st.markdown(f"### {icono}")
@@ -375,7 +542,6 @@ def tarjeta_estado_alerta(row):
 
         with c3:
             st.caption("Estado")
-
             if estado == "OK":
                 st.success(estado_txt)
             elif estado == "ALERTA":
@@ -383,14 +549,13 @@ def tarjeta_estado_alerta(row):
             else:
                 st.warning(estado_txt)
 
-        with c4:
-            st.caption("Días sin registro")
-            st.markdown(f"### {dias_txt}")
+            st.caption("Días")
+            st.markdown(f"**{dias_txt}**")
 
-        with c5:
+        with c4:
             st.caption("Último registro")
             st.markdown(f"**{ultimo}**")
-            st.markdown(f"**Operador:** {ultimo_operador}")
+            st.markdown(f"Operador: **{ultimo_operador}**")
             st.caption(f"Umbral: {umbral} días · Registros: {registros}")
 
         if estado != "OK":
@@ -608,13 +773,9 @@ def pagina_inicio():
 
     st.markdown(
         """
-        <div style='text-align:center; margin-bottom:1.6rem;'>
-            <h1 style='margin-top:0;'>
-                Portal Área de Operaciones CCU
-            </h1>
-            <p style='font-size:18px; opacity:0.75; margin-top:0.4rem;'>
-                Selecciona un dashboard o formulario desde el menú lateral.
-            </p>
+        <div class='portal-header'>
+            <h1>Portal Área de Operaciones CCU</h1>
+            <p>Selecciona un dashboard o formulario desde el menú lateral.</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -627,42 +788,18 @@ def pagina_inicio():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.info(
-            """
-            **Línea 2 · Tulipas**
-
-            Dashboard de análisis para Encajonadora / Desencajonadora Línea 2.
-            """
-        )
+        st.info("**Línea 2 · Tulipas**\n\nDashboard de análisis para Encajonadora / Desencajonadora Línea 2.")
 
     with col2:
-        st.info(
-            """
-            **Línea 2 · Válvulas**
-
-            Dashboard de mantenimiento de válvulas Krones Línea 2.
-            """
-        )
+        st.info("**Línea 2 · Válvulas**\n\nDashboard de mantenimiento de válvulas Krones Línea 2.")
 
     col3, col4 = st.columns(2)
 
     with col3:
-        st.info(
-            """
-            **Línea 11 · Tulipas**
-
-            Dashboard de análisis para Encajonadora / Desencajonadora Línea 11.
-            """
-        )
+        st.info("**Línea 11 · Tulipas**\n\nDashboard de análisis para Encajonadora / Desencajonadora Línea 11.")
 
     with col4:
-        st.info(
-            """
-            **Línea 11 · Válvulas**
-
-            Dashboard de mantenimiento de válvulas Krones Línea 11.
-            """
-        )
+        st.info("**Línea 11 · Válvulas**\n\nDashboard de mantenimiento de válvulas Krones Línea 11.")
 
     st.markdown("---")
 
@@ -671,22 +808,10 @@ def pagina_inicio():
     f1, f2 = st.columns(2)
 
     with f1:
-        st.success(
-            """
-            **Formularios Línea 2**
-
-            Registro operacional para tulipas y válvulas.
-            """
-        )
+        st.success("**Formularios Línea 2**\n\nRegistro operacional para tulipas y válvulas.")
 
     with f2:
-        st.success(
-            """
-            **Formularios Línea 11**
-
-            Registro operacional para tulipas y válvulas.
-            """
-        )
+        st.success("**Formularios Línea 11**\n\nRegistro operacional para tulipas y válvulas.")
 
     st.markdown("---")
 
@@ -694,7 +819,7 @@ def pagina_inicio():
 
 
 # =====================================================
-# PÁGINA ALERTAS
+# PÁGINA ALERTAS COMPACTA
 # =====================================================
 
 def pagina_alertas():
@@ -702,19 +827,13 @@ def pagina_alertas():
 
     st.markdown(
         """
-        <div style='text-align:center; margin-bottom:1.2rem;'>
-            <h1 style='margin-top:0;'>
-                Alertas de registros pendientes
-            </h1>
-            <p style='font-size:17px; opacity:0.75; margin-top:0.4rem;'>
-                Dashboards separados por línea y ordenados por mayor cantidad de días sin registro.
-            </p>
+        <div class='portal-header'>
+            <h1>Alertas de registros pendientes</h1>
+            <p>Resumen rápido por línea. El detalle queda disponible en la parte inferior.</p>
         </div>
         """,
         unsafe_allow_html=True
     )
-
-    st.markdown("---")
 
     st.sidebar.markdown("## Configuración de alertas")
 
@@ -786,88 +905,128 @@ def pagina_alertas():
     total_alertas = int((df_alertas["Estado"] == "ALERTA").sum())
     total_error = int((df_alertas["Estado"] == "ERROR").sum())
 
-    k1, k2, k3, k4 = st.columns(4)
-
-    with k1:
-        tarjeta_resumen("Dashboards", total_dashboards)
-
-    with k2:
-        tarjeta_resumen("Al día", total_ok, "✅")
-
-    with k3:
-        tarjeta_resumen("Alertas", total_alertas, "🚨")
-
-    with k4:
-        tarjeta_resumen("Errores", total_error, "⚠️")
+    st.markdown("## Estado general")
 
     if total_alertas > 0:
-        st.error(
-            f"{total_alertas} dashboard(s) superan el umbral de {umbral_global} días sin registros."
+        st.markdown(
+            f"""
+            <div class="alert-main-warning">
+                <div class="alert-title">🚨 Hay {total_alertas} alerta(s) activa(s)</div>
+                <div class="alert-subtitle">
+                    Al menos un dashboard supera el umbral de {umbral_global} días sin registro.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
     elif total_error > 0:
-        st.warning(
-            f"No hay alertas por antigüedad, pero hay {total_error} dashboard(s) con error de lectura."
+        st.markdown(
+            f"""
+            <div class="alert-main-error">
+                <div class="alert-title">⚠️ Hay {total_error} error(es) de lectura</div>
+                <div class="alert-subtitle">
+                    No hay alertas por antigüedad, pero existe un problema leyendo datos.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
     else:
-        st.success(
-            f"Todos los dashboards tienen registros dentro del umbral de {umbral_global} días."
+        st.markdown(
+            f"""
+            <div class="alert-main-ok">
+                <div class="alert-title">✅ Todo al día</div>
+                <div class="alert-subtitle">
+                    Todos los dashboards tienen registros dentro del umbral de {umbral_global} días.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown("")
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        st.markdown(
+            f"""
+            <div class="mini-card">
+                <div class="mini-card-title">Dashboards</div>
+                <div class="mini-card-value">{total_dashboards}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with c2:
+        st.markdown(
+            f"""
+            <div class="mini-card">
+                <div class="mini-card-title">Al día</div>
+                <div class="mini-card-value">✅ {total_ok}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with c3:
+        st.markdown(
+            f"""
+            <div class="mini-card">
+                <div class="mini-card-title">Alertas</div>
+                <div class="mini-card-value">🚨 {total_alertas}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with c4:
+        st.markdown(
+            f"""
+            <div class="mini-card">
+                <div class="mini-card-title">Errores</div>
+                <div class="mini-card-value">⚠️ {total_error}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
     st.markdown("---")
+
+    st.markdown("## Resumen por línea")
 
     df_linea_2 = df_alertas[df_alertas["Línea"] == "Línea 2"].copy()
-
-    st.markdown("## Línea 2")
-
-    if df_linea_2.empty:
-        st.info("No hay dashboards configurados para Línea 2.")
-    else:
-        l2_ok = int((df_linea_2["Estado"] == "OK").sum())
-        l2_alertas = int((df_linea_2["Estado"] == "ALERTA").sum())
-        l2_error = int((df_linea_2["Estado"] == "ERROR").sum())
-
-        c1, c2, c3 = st.columns(3)
-
-        with c1:
-            tarjeta_resumen("Al día Línea 2", l2_ok, "✅")
-
-        with c2:
-            tarjeta_resumen("Alertas Línea 2", l2_alertas, "🚨")
-
-        with c3:
-            tarjeta_resumen("Errores Línea 2", l2_error, "⚠️")
-
-        for _, row in df_linea_2.iterrows():
-            tarjeta_estado_alerta(row)
-
-    st.markdown("---")
-
     df_linea_11 = df_alertas[df_alertas["Línea"] == "Línea 11"].copy()
 
-    st.markdown("## Línea 11")
+    col_l2, col_l11 = st.columns(2)
 
-    if df_linea_11.empty:
-        st.info("No hay dashboards configurados para Línea 11.")
-    else:
-        l11_ok = int((df_linea_11["Estado"] == "OK").sum())
-        l11_alertas = int((df_linea_11["Estado"] == "ALERTA").sum())
-        l11_error = int((df_linea_11["Estado"] == "ERROR").sum())
+    with col_l2:
+        tarjeta_alerta_compacta_linea("Línea 2", df_linea_2)
 
-        c1, c2, c3 = st.columns(3)
-
-        with c1:
-            tarjeta_resumen("Al día Línea 11", l11_ok, "✅")
-
-        with c2:
-            tarjeta_resumen("Alertas Línea 11", l11_alertas, "🚨")
-
-        with c3:
-            tarjeta_resumen("Errores Línea 11", l11_error, "⚠️")
-
-        for _, row in df_linea_11.iterrows():
-            tarjeta_estado_alerta(row)
+    with col_l11:
+        tarjeta_alerta_compacta_linea("Línea 11", df_linea_11)
 
     st.markdown("---")
+
+    st.markdown("## Detalle")
+
+    with st.expander("Ver detalle por dashboard", expanded=False):
+        st.markdown("### Línea 2")
+
+        if df_linea_2.empty:
+            st.info("No hay dashboards configurados para Línea 2.")
+        else:
+            for _, row in df_linea_2.iterrows():
+                tarjeta_estado_alerta_detalle(row)
+
+        st.markdown("### Línea 11")
+
+        if df_linea_11.empty:
+            st.info("No hay dashboards configurados para Línea 11.")
+        else:
+            for _, row in df_linea_11.iterrows():
+                tarjeta_estado_alerta_detalle(row)
 
     with st.expander("Ver tabla completa y descargas", expanded=False):
         df_alertas_mostrar = df_alertas.copy()
