@@ -8,7 +8,8 @@ import os
 
 st.set_page_config(page_title="Visor Excel L2", layout="wide")
 
-st.title("Visor, análisis y gestión de fotos por máquina")
+st.title("Visor, análisis, fotos e IDs agrupados")
+
 
 archivo = st.file_uploader(
     "Sube tu archivo Excel",
@@ -543,11 +544,12 @@ if archivo is not None:
                         else:
                             df_filtrado = df_filtrado.iloc[0:0]
 
-        tab_display, tab_analisis, tab_fotos = st.tabs(
+        tab_display, tab_analisis, tab_fotos, tab_id_agrupado = st.tabs(
             [
                 "Display filtrado",
                 "Análisis de data filtrada",
-                "Fotos por ID / Máquina"
+                "Fotos por ID / Máquina",
+                "Crear ID agrupado"
             ]
         )
 
@@ -938,6 +940,283 @@ if archivo is not None:
 
                 else:
                     st.info("Sube fotos para asociarlas con una máquina y un ID.")
+
+        with tab_id_agrupado:
+            st.subheader("Crear ID agrupado desde varios IDs existentes")
+
+            st.write(
+                "Selecciona una máquina y uno o más IDs. "
+                "La app mostrará la información original de cada ID por columna. "
+                "El usuario debe completar manualmente el valor final agrupado. "
+                "En tiempo estimado se muestra la suma como ayuda."
+            )
+
+            if df_filtrado.empty:
+                st.warning("No hay datos filtrados disponibles para crear un ID agrupado.")
+            else:
+                df_base_agrupado = df_filtrado.copy()
+
+                df_base_agrupado["Id Estándar"] = df_base_agrupado["Id Estándar"].astype(str)
+                df_base_agrupado["Maquina"] = df_base_agrupado["Maquina"].astype(str)
+
+                maquinas_disponibles_agrupado = (
+                    df_base_agrupado["Maquina"]
+                    .dropna()
+                    .astype(str)
+                    .value_counts()
+                    .index
+                    .tolist()
+                )
+
+                maquina_agrupada = st.selectbox(
+                    "Selecciona la máquina",
+                    options=maquinas_disponibles_agrupado,
+                    key="maquina_id_agrupado"
+                )
+
+                df_maquina_agrupada = df_base_agrupado[
+                    df_base_agrupado["Maquina"].astype(str) == str(maquina_agrupada)
+                ].copy()
+
+                ids_disponibles_agrupado = (
+                    df_maquina_agrupada["Id Estándar"]
+                    .dropna()
+                    .astype(str)
+                    .sort_values()
+                    .unique()
+                    .tolist()
+                )
+
+                ids_seleccionados = st.multiselect(
+                    "Selecciona los IDs que quieres agrupar",
+                    options=ids_disponibles_agrupado,
+                    default=[]
+                )
+
+                if ids_seleccionados:
+                    df_ids_seleccionados = df_maquina_agrupada[
+                        df_maquina_agrupada["Id Estándar"].astype(str).isin(ids_seleccionados)
+                    ].copy()
+
+                    st.write(
+                        f"IDs seleccionados: **{len(ids_seleccionados)}** | "
+                        f"Registros encontrados: **{df_ids_seleccionados.shape[0]}**"
+                    )
+
+                    with st.expander("Ver registros originales seleccionados", expanded=True):
+                        st.dataframe(
+                            df_ids_seleccionados,
+                            use_container_width=True,
+                            height=350
+                        )
+
+                    st.divider()
+
+                    st.subheader("Comparación por columna")
+
+                    st.write(
+                        "Revisa los valores originales de cada ID. "
+                        "Luego completa el valor final agrupado en la sección inferior."
+                    )
+
+                    for columna in df_ids_seleccionados.columns:
+                        with st.expander(f"Columna: {columna}", expanded=False):
+                            tabla_columna = df_ids_seleccionados[
+                                ["Id Estándar", "Maquina", columna]
+                            ].copy()
+
+                            tabla_columna = tabla_columna.rename(
+                                columns={
+                                    columna: "Valor original"
+                                }
+                            )
+
+                            st.dataframe(
+                                tabla_columna,
+                                use_container_width=True
+                            )
+
+                    st.divider()
+
+                    st.subheader("Completar información final del ID agrupado")
+
+                    st.write(
+                        "Escribe el valor final que tendrá el nuevo ID agrupado. "
+                        "Los campos aparecen vacíos para que el usuario decida el contenido final, "
+                        "excepto el tiempo estimado, donde se muestra la suma como ayuda."
+                    )
+
+                    valores_finales = {}
+
+                    ids_unidos = "_".join(ids_seleccionados)
+
+                    valores_finales["Id Estándar"] = st.text_input(
+                        "Id Estándar final",
+                        value=f"AGRUPADO_{ids_unidos}",
+                        key="final_id_estandar"
+                    )
+
+                    valores_finales["Maquina"] = st.text_input(
+                        "Maquina final",
+                        value=maquina_agrupada,
+                        key="final_maquina"
+                    )
+
+                    columnas_editables = [
+                        col for col in df_ids_seleccionados.columns
+                        if col not in ["Id Estándar", "Maquina"]
+                    ]
+
+                    columnas_text_area = [
+                        "Descripción Estándar Visual",
+                        "Descripción Actividad",
+                        "Epp",
+                        "Materiales/Herramientas"
+                    ]
+
+                    for columna in columnas_editables:
+                        st.markdown(f"### {columna}")
+
+                        with st.expander(f"Ver valores originales de {columna}", expanded=False):
+                            tabla_columna = df_ids_seleccionados[
+                                ["Id Estándar", columna]
+                            ].copy()
+
+                            tabla_columna = tabla_columna.rename(
+                                columns={
+                                    columna: "Valor original"
+                                }
+                            )
+
+                            st.dataframe(
+                                tabla_columna,
+                                use_container_width=True
+                            )
+
+                        if columna == "Tiempo Estimado (en Minutos)":
+                            tiempos = pd.to_numeric(
+                                df_ids_seleccionados[columna],
+                                errors="coerce"
+                            ).dropna()
+
+                            suma_tiempos = float(tiempos.sum()) if not tiempos.empty else 0.0
+
+                            st.info(
+                                f"Suma sugerida de tiempos seleccionados: {suma_tiempos:.2f} minutos"
+                            )
+
+                            valores_finales[columna] = st.number_input(
+                                f"Valor final para {columna}",
+                                min_value=0.0,
+                                value=suma_tiempos,
+                                step=1.0,
+                                key=f"final_{columna}"
+                            )
+
+                        elif columna in columnas_text_area:
+                            valores_finales[columna] = st.text_area(
+                                f"Valor final para {columna}",
+                                value="",
+                                height=120,
+                                key=f"final_{columna}"
+                            )
+
+                        else:
+                            valores_finales[columna] = st.text_input(
+                                f"Valor final para {columna}",
+                                value="",
+                                key=f"final_{columna}"
+                            )
+
+                    st.divider()
+
+                    st.subheader("Vista previa del nuevo ID agrupado")
+
+                    df_id_agrupado = pd.DataFrame([valores_finales])
+
+                    columnas_ordenadas = [
+                        col for col in df_filtrado.columns
+                        if col in df_id_agrupado.columns
+                    ]
+
+                    df_id_agrupado = df_id_agrupado[columnas_ordenadas]
+
+                    st.dataframe(
+                        df_id_agrupado,
+                        use_container_width=True
+                    )
+
+                    st.subheader("Descargar nuevo ID agrupado")
+
+                    excel_id_agrupado = dataframe_a_excel_bytes(
+                        df_id_agrupado,
+                        nombre_hoja="ID agrupado"
+                    )
+
+                    nombre_archivo_agrupado = limpiar_nombre_archivo(
+                        f"{valores_finales['Id Estándar']}_{valores_finales['Maquina']}"
+                    )
+
+                    st.download_button(
+                        label="Descargar solo el nuevo ID agrupado",
+                        data=excel_id_agrupado,
+                        file_name=f"{nombre_archivo_agrupado}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+
+                    st.divider()
+
+                    st.subheader("Descargar data filtrada con el ID agrupado")
+
+                    incluir_originales = st.checkbox(
+                        "Mantener también los IDs originales seleccionados",
+                        value=False
+                    )
+
+                    if incluir_originales:
+                        df_final_con_agrupado = pd.concat(
+                            [df_filtrado, df_id_agrupado],
+                            ignore_index=True
+                        )
+                    else:
+                        df_sin_ids_originales = df_filtrado[
+                            ~(
+                                (df_filtrado["Maquina"].astype(str) == str(maquina_agrupada))
+                                &
+                                (df_filtrado["Id Estándar"].astype(str).isin(ids_seleccionados))
+                            )
+                        ].copy()
+
+                        df_final_con_agrupado = pd.concat(
+                            [df_sin_ids_originales, df_id_agrupado],
+                            ignore_index=True
+                        )
+
+                    st.write(
+                        f"Filas finales con ID agrupado: **{df_final_con_agrupado.shape[0]}**"
+                    )
+
+                    with st.expander("Ver data final con ID agrupado", expanded=False):
+                        st.dataframe(
+                            df_final_con_agrupado,
+                            use_container_width=True,
+                            height=400
+                        )
+
+                    excel_final_agrupado = dataframe_a_excel_bytes(
+                        df_final_con_agrupado,
+                        nombre_hoja="Data final"
+                    )
+
+                    st.download_button(
+                        label="Descargar data filtrada con ID agrupado",
+                        data=excel_final_agrupado,
+                        file_name="data_filtrada_con_id_agrupado.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+
+                else:
+                    st.info("Selecciona uno o más IDs para crear un ID agrupado.")
 
     except ImportError:
         st.error("Falta instalar alguna librería necesaria.")
