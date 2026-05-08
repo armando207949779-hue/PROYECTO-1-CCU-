@@ -4,10 +4,11 @@ import re
 import plotly.express as px
 from io import BytesIO
 import zipfile
+import os
 
 st.set_page_config(page_title="Visor Excel L2", layout="wide")
 
-st.title("Visor y análisis de archivos Excel")
+st.title("Visor, análisis y gestión de fotos por máquina")
 
 archivo = st.file_uploader(
     "Sube tu archivo Excel",
@@ -70,31 +71,30 @@ def limpiar_nombre_archivo(texto):
     texto = str(texto).strip()
     texto = re.sub(r'[\\/*?:"<>|]', "_", texto)
     texto = re.sub(r"\s+", " ", texto)
-    return texto[:80]
+    return texto[:100]
 
 
 def dataframe_a_excel_bytes(df_descarga, nombre_hoja="Datos"):
     output = BytesIO()
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        nombre_hoja = nombre_hoja[:31]
+
         df_descarga.to_excel(
             writer,
             index=False,
-            sheet_name=nombre_hoja[:31]
+            sheet_name=nombre_hoja
         )
 
-        worksheet = writer.sheets[nombre_hoja[:31]]
+        worksheet = writer.sheets[nombre_hoja]
 
         for column_cells in worksheet.columns:
             max_length = 0
             column_letter = column_cells[0].column_letter
 
             for cell in column_cells:
-                try:
-                    valor = str(cell.value) if cell.value is not None else ""
-                    max_length = max(max_length, len(valor))
-                except:
-                    pass
+                valor = str(cell.value) if cell.value is not None else ""
+                max_length = max(max_length, len(valor))
 
             worksheet.column_dimensions[column_letter].width = min(max_length + 2, 45)
 
@@ -194,6 +194,50 @@ def filtro_checkboxes_vertical(
     return seleccionados
 
 
+def crear_nombre_foto(id_estandar, maquina, detalle_maquina, nombre_original):
+    extension = os.path.splitext(nombre_original)[1].lower()
+
+    id_limpio = limpiar_nombre_archivo(id_estandar)
+    maquina_limpia = limpiar_nombre_archivo(maquina)
+    detalle_limpio = limpiar_nombre_archivo(detalle_maquina)
+
+    if detalle_limpio and detalle_limpio.lower() != "nan":
+        nombre = f"ID_{id_limpio}_{maquina_limpia}_{detalle_limpio}{extension}"
+    else:
+        nombre = f"ID_{id_limpio}_{maquina_limpia}{extension}"
+
+    return nombre
+
+
+def crear_zip_fotos_por_maquina(fotos_configuradas):
+    zip_buffer = BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for item in fotos_configuradas:
+            archivo_foto = item["archivo"]
+            id_estandar = item["id_estandar"]
+            maquina = item["maquina"]
+            detalle_maquina = item["detalle_maquina"]
+
+            carpeta_maquina = limpiar_nombre_archivo(maquina)
+            nombre_foto = crear_nombre_foto(
+                id_estandar=id_estandar,
+                maquina=maquina,
+                detalle_maquina=detalle_maquina,
+                nombre_original=archivo_foto.name
+            )
+
+            ruta_dentro_zip = f"{carpeta_maquina}/{nombre_foto}"
+
+            zip_file.writestr(
+                ruta_dentro_zip,
+                archivo_foto.getvalue()
+            )
+
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue()
+
+
 if archivo is not None:
     try:
         excel = pd.ExcelFile(archivo, engine="openpyxl")
@@ -216,6 +260,12 @@ if archivo is not None:
 
         if "Maquina" not in df.columns:
             st.error("No existe la columna 'Maquina' en el archivo Excel.")
+            st.write("Columnas encontradas:")
+            st.write(list(df.columns))
+            st.stop()
+
+        if "Id Estándar" not in df.columns:
+            st.error("No existe la columna 'Id Estándar' en el archivo Excel.")
             st.write("Columnas encontradas:")
             st.write(list(df.columns))
             st.stop()
@@ -498,10 +548,11 @@ if archivo is not None:
                         else:
                             df_filtrado = df_filtrado.iloc[0:0]
 
-        tab_display, tab_analisis = st.tabs(
+        tab_display, tab_analisis, tab_fotos = st.tabs(
             [
                 "Display filtrado",
-                "Análisis de data filtrada"
+                "Análisis de data filtrada",
+                "Fotos por ID / Máquina"
             ]
         )
 
@@ -708,6 +759,146 @@ if archivo is not None:
                     )
                 else:
                     st.info("No hay columnas numéricas para resumir.")
+
+        with tab_fotos:
+            st.subheader("Subir fotos y asociarlas con ID / Máquina")
+
+            st.write(
+                "Las fotos se renombran automáticamente con el formato: "
+                "**ID_Maquina_DetalleMaquina.extensión** "
+                "y se descargan en un ZIP con carpetas por máquina."
+            )
+
+            if df_filtrado.empty:
+                st.warning("No hay datos filtrados disponibles para asociar fotos.")
+            else:
+                df_ids = df_filtrado.copy()
+
+                df_ids["Id Estándar"] = df_ids["Id Estándar"].astype(str)
+
+                columnas_info = ["Id Estándar", "Maquina"]
+
+                if "Detalle Maquina" in df_ids.columns:
+                    columnas_info.append("Detalle Maquina")
+
+                if "Descripción Estándar Visual" in df_ids.columns:
+                    columnas_info.append("Descripción Estándar Visual")
+
+                df_opciones = (
+                    df_ids[columnas_info]
+                    .drop_duplicates()
+                    .sort_values(["Maquina", "Id Estándar"])
+                    .reset_index(drop=True)
+                )
+
+                st.write(f"IDs disponibles según filtros actuales: **{df_opciones.shape[0]}**")
+
+                with st.expander("Ver IDs disponibles", expanded=False):
+                    st.dataframe(
+                        df_opciones,
+                        use_container_width=True,
+                        height=350
+                    )
+
+                fotos_subidas = st.file_uploader(
+                    "Sube una o varias fotos",
+                    type=["jpg", "jpeg", "png", "webp"],
+                    accept_multiple_files=True
+                )
+
+                if fotos_subidas:
+                    st.subheader("Asociar cada foto")
+
+                    ids_disponibles = df_opciones["Id Estándar"].astype(str).tolist()
+
+                    fotos_configuradas = []
+
+                    for idx, foto in enumerate(fotos_subidas):
+                        st.divider()
+
+                        col_foto, col_config = st.columns([1, 2])
+
+                        with col_foto:
+                            st.image(
+                                foto,
+                                caption=foto.name,
+                                use_container_width=True
+                            )
+
+                        with col_config:
+                            id_seleccionado = st.selectbox(
+                                f"Selecciona ID para: {foto.name}",
+                                options=ids_disponibles,
+                                key=f"id_foto_{idx}_{foto.name}"
+                            )
+
+                            fila_id = df_opciones[
+                                df_opciones["Id Estándar"].astype(str) == str(id_seleccionado)
+                            ].iloc[0]
+
+                            maquina = str(fila_id["Maquina"])
+
+                            if "Detalle Maquina" in df_opciones.columns:
+                                detalle_maquina = str(fila_id["Detalle Maquina"])
+                            else:
+                                detalle_maquina = ""
+
+                            nombre_final = crear_nombre_foto(
+                                id_estandar=id_seleccionado,
+                                maquina=maquina,
+                                detalle_maquina=detalle_maquina,
+                                nombre_original=foto.name
+                            )
+
+                            carpeta_final = limpiar_nombre_archivo(maquina)
+
+                            st.write(f"**Máquina:** {maquina}")
+                            st.write(f"**Carpeta:** `{carpeta_final}/`")
+                            st.write(f"**Nombre final:** `{nombre_final}`")
+
+                            fotos_configuradas.append(
+                                {
+                                    "archivo": foto,
+                                    "id_estandar": id_seleccionado,
+                                    "maquina": maquina,
+                                    "detalle_maquina": detalle_maquina,
+                                    "nombre_final": nombre_final,
+                                    "carpeta": carpeta_final
+                                }
+                            )
+
+                    st.subheader("Resumen de fotos configuradas")
+
+                    resumen_fotos = pd.DataFrame(
+                        [
+                            {
+                                "Foto original": item["archivo"].name,
+                                "Id Estándar": item["id_estandar"],
+                                "Maquina": item["maquina"],
+                                "Detalle Maquina": item["detalle_maquina"],
+                                "Carpeta": item["carpeta"],
+                                "Nombre final": item["nombre_final"]
+                            }
+                            for item in fotos_configuradas
+                        ]
+                    )
+
+                    st.dataframe(
+                        resumen_fotos,
+                        use_container_width=True
+                    )
+
+                    zip_fotos = crear_zip_fotos_por_maquina(fotos_configuradas)
+
+                    st.download_button(
+                        label="Descargar fotos renombradas por máquina en ZIP",
+                        data=zip_fotos,
+                        file_name="fotos_por_maquina.zip",
+                        mime="application/zip"
+                    )
+
+                else:
+                    st.info("Sube fotos para asociarlas con un ID.")
 
     except ImportError:
         st.error("Falta instalar alguna librería necesaria.")
