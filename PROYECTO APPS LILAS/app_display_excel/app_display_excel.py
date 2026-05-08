@@ -75,7 +75,7 @@ if LOGO_PATH.exists():
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-top: 1.6rem;
+            margin-top: 3.8rem;
             margin-bottom: 1.1rem;
         ">
             <img
