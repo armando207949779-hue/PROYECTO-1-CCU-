@@ -1,19 +1,44 @@
 # App Streamlit Formulario Tulipas Línea 11 - MATRIZ POR FORMATO
+# Versión homologada con Tulipas Línea 2, con logo CCU y formato actualizado
 
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from pathlib import Path
+import base64
 
+# =====================================================
+# CONFIGURACIÓN GENERAL
+# =====================================================
 st.set_page_config(
     page_title="Formulario Mantenimiento Tulipas Línea 11",
+    page_icon="🏢",
     layout="centered"
 )
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1PmDo4EjBxXZx0fPMGPMJKzBztyAq8AipxqCsJTFI0e0/edit?usp=sharing"
 ZONA_HORARIA = ZoneInfo("America/Santiago")
 
+# =====================================================
+# RUTAS DEL PROYECTO / LOGO
+# =====================================================
+BASE_DIR = Path(__file__).resolve().parent
+
+LOGO_CANDIDATES = [
+    BASE_DIR / "assets" / "CCU_logo_(2018).svg.png",
+    BASE_DIR.parent / "assets" / "CCU_logo_(2018).svg.png",
+]
+
+LOGO_PATH = next(
+    (path for path in LOGO_CANDIDATES if path.exists()),
+    LOGO_CANDIDATES[0]
+)
+
+# =====================================================
+# LISTAS FORMULARIO
+# =====================================================
 TURNOS = ["", "A", "B", "C"]
 
 OPERADORES = [
@@ -49,6 +74,9 @@ MANTENCIONES = [
 ]
 
 
+# =====================================================
+# GOOGLE SHEETS
+# =====================================================
 @st.cache_resource(ttl=60)
 def conectar():
     scope = [
@@ -96,19 +124,162 @@ def obtener_hora_chile():
     return datetime.now(ZONA_HORARIA).strftime("%Y-%m-%d %H:%M:%S")
 
 
+# =====================================================
+# ESTILO GENERAL
+# =====================================================
 st.markdown(
     """
-    <div style='text-align: center; padding: 12px 10px 4px 10px;'>
-        <h1 style='color:#0E4C92; margin-bottom:4px; font-size: 2.1rem;'>
+    <style>
+    .block-container {
+        padding-top: 2.2rem;
+        padding-bottom: 1.2rem;
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 0.2rem;
+        color: #0E4C92;
+        line-height: 1.15;
+    }
+
+    h2 {
+        color: #2E86C1;
+    }
+
+    h3 {
+        color: #0E4C92;
+    }
+
+    div[data-testid="stCheckbox"] {
+        margin-bottom: -10px;
+    }
+
+    div[data-testid="stCheckbox"] label {
+        font-size: 0.76rem;
+    }
+
+    div[data-testid="stVerticalBlock"] {
+        gap: 0.35rem;
+    }
+
+    .logo-wrapper {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding-top: 1.2rem;
+        padding-bottom: 2.8rem;
+        margin-bottom: 0.4rem;
+    }
+
+    .logo-wrapper img {
+        width: 190px;
+        max-width: 70%;
+        display: block;
+    }
+
+    .header-wrapper {
+        text-align: center;
+        padding: 0px 10px 8px 10px;
+        max-width: 850px;
+        margin: 0 auto 1.2rem auto;
+    }
+
+    .header-wrapper h1 {
+        color: #0E4C92;
+        margin-top: 0px;
+        margin-bottom: 18px;
+        font-size: 2.1rem;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+    }
+
+    .header-wrapper h2 {
+        color: #2E86C1;
+        margin-top: 0px;
+        margin-bottom: 18px;
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .header-wrapper p {
+        color: #5D6D7E;
+        font-size: 1rem;
+        margin-top: 0px;
+        margin-bottom: 18px;
+    }
+
+    .header-wrapper hr {
+        border: 1px solid #D6EAF8;
+        width: 75%;
+        margin-top: 10px;
+        margin-bottom: 0px;
+    }
+
+    .matriz-tulipas {
+        padding-left: 10px;
+        padding-right: 10px;
+        margin-top: 6px;
+    }
+
+    .tulipas-resumen {
+        background-color: rgba(30, 144, 255, 0.14);
+        color: #1E90FF;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 12px 10px 4px 10px;
+        font-size: 0.95rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# =====================================================
+# FUNCIÓN LOGO
+# =====================================================
+def mostrar_logo():
+    if LOGO_PATH.exists():
+        logo_base64 = base64.b64encode(LOGO_PATH.read_bytes()).decode("utf-8")
+
+        st.markdown(
+            f"""
+            <div class="logo-wrapper">
+                <img
+                    src="data:image/png;base64,{logo_base64}"
+                    alt="Logo CCU"
+                >
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.warning(f"Logo no encontrado: {LOGO_PATH}")
+
+
+# =====================================================
+# ENCABEZADO
+# =====================================================
+mostrar_logo()
+
+st.markdown(
+    """
+    <div class='header-wrapper'>
+        <h1>
             FORMULARIO DE MANTENIMIENTO
         </h1>
-        <h2 style='color:#2E86C1; margin-top:0px; font-size: 1.25rem; font-weight: 600;'>
+        <h2>
             LÍNEA 11 · TULIPAS
         </h2>
-        <p style='color:#5D6D7E; font-size: 1rem; margin-top: 8px;'>
+        <p>
             Registro de mantenciones por formato, cabezal y tulipa
         </p>
-        <hr style='border: 1px solid #D6EAF8; width:75%; margin-top: 10px;'>
+        <hr>
     </div>
     """,
     unsafe_allow_html=True
@@ -117,6 +288,9 @@ st.markdown(
 st.info("Complete todos los campos requeridos antes de guardar el registro.")
 
 
+# =====================================================
+# DATOS GENERALES
+# =====================================================
 with st.container(border=True):
     st.subheader("Datos generales")
 
@@ -141,6 +315,9 @@ with st.container(border=True):
     formato = st.selectbox("Formato", FORMATOS)
 
 
+# =====================================================
+# SELECCIÓN DE TULIPAS
+# =====================================================
 with st.container(border=True):
     st.subheader("Selección de tulipas")
 
@@ -157,7 +334,14 @@ with st.container(border=True):
             f"Tulipas disponibles: T1 a T30"
         )
 
-        header = st.columns(len(cabezales) + 1)
+        st.markdown(
+            """
+            <div class="matriz-tulipas">
+            """,
+            unsafe_allow_html=True
+        )
+
+        header = st.columns(len(cabezales) + 1, gap="small")
 
         with header[0]:
             st.markdown("**Tulipa**")
@@ -167,7 +351,7 @@ with st.container(border=True):
                 st.markdown(f"**C{c}**")
 
         for t in TULIPAS:
-            cols = st.columns(len(cabezales) + 1)
+            cols = st.columns(len(cabezales) + 1, gap="small")
 
             with cols[0]:
                 st.markdown(f"**T{t}**")
@@ -188,12 +372,24 @@ with st.container(border=True):
                             "Tulipa": t
                         })
 
-        st.info(f"Tulipas seleccionadas: {len(seleccion_tulipas)}")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown(
+            f"""
+            <div class="tulipas-resumen">
+                Tulipas seleccionadas: {len(seleccion_tulipas)}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         if seleccion_tulipas:
             st.write(seleccion_tulipas)
 
 
+# =====================================================
+# MANTENCIÓN
+# =====================================================
 with st.container(border=True):
     st.subheader("Mantención")
 
@@ -216,6 +412,9 @@ with st.container(border=True):
     )
 
 
+# =====================================================
+# RESUMEN
+# =====================================================
 with st.container(border=True):
     st.subheader("Resumen")
 
@@ -230,6 +429,9 @@ with st.container(border=True):
     guardar = st.button("Guardar registro", use_container_width=True)
 
 
+# =====================================================
+# VALIDACIÓN Y GUARDADO
+# =====================================================
 if guardar:
 
     errores = []
@@ -288,11 +490,14 @@ if guardar:
             st.error(f"Error al guardar: {e}")
 
 
+# =====================================================
+# FOOTER
+# =====================================================
 st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Tulipas Línea 11</b> · v3.0<br>
+        <b>Formulario Mantenimiento Tulipas Línea 11</b> · v3.1<br>
         Streamlit · Google Sheets
     </div>
     """,
