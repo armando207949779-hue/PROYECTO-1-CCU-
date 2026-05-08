@@ -73,10 +73,21 @@ st.markdown(
         border-radius: 0.5rem;
         padding: 0.5rem;
         border: 1px solid rgba(128,128,128,0.20);
+        min-height: 112px;
     }
 
     div[data-testid="stMetric"] label {
         font-size: 0.88rem;
+    }
+
+    div[data-testid="stMetricValue"] {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        font-size: 2rem;
+    }
+
+    div[data-testid="stMetricDelta"] {
+        white-space: normal;
     }
     </style>
     """,
@@ -146,7 +157,10 @@ def obtener_ultimo_registro(df):
     df_tmp = df.copy()
 
     if "Fecha registro" in df_tmp.columns:
-        df_tmp["Fecha_orden"] = pd.to_datetime(df_tmp["Fecha registro"], errors="coerce")
+        df_tmp["Fecha_orden"] = pd.to_datetime(
+            df_tmp["Fecha registro"],
+            errors="coerce"
+        )
         df_tmp["Fecha_orden"] = df_tmp["Fecha_orden"].fillna(df_tmp["Fecha"])
     else:
         df_tmp["Fecha_orden"] = df_tmp["Fecha"]
@@ -221,6 +235,106 @@ def calcular_promedio_cambio_goma(df):
         return None
 
     return sum(diferencias) / len(diferencias)
+
+
+def obtener_operador_menos_registros(df_filtrado, operadores_disponibles):
+    if not operadores_disponibles:
+        return "Sin operadores", 0
+
+    conteo = (
+        df_filtrado["Operador"]
+        .replace("", "SIN OPERADOR")
+        .value_counts()
+        .to_dict()
+    )
+
+    registros_operadores = []
+
+    for operador in operadores_disponibles:
+        operador_txt = str(operador).strip().upper()
+        cantidad = conteo.get(operador_txt, 0)
+
+        registros_operadores.append({
+            "Operador": operador_txt,
+            "Registros": cantidad
+        })
+
+    df_operadores = pd.DataFrame(registros_operadores)
+
+    if df_operadores.empty:
+        return "Sin operadores", 0
+
+    menor = df_operadores.sort_values(
+        ["Registros", "Operador"],
+        ascending=[True, True]
+    ).iloc[0]
+
+    return menor["Operador"], int(menor["Registros"])
+
+
+def tarjeta_kpi(titulo, valor, detalle=None, alerta=False):
+    color_detalle = "#4ade80"
+    borde = "rgba(128,128,128,0.22)"
+    fondo = "rgba(255,255,255,0.02)"
+
+    if alerta:
+        color_detalle = "#facc15"
+        borde = "rgba(250,204,21,0.55)"
+        fondo = "rgba(250,204,21,0.06)"
+
+    detalle_html = ""
+
+    if detalle:
+        detalle_html = f"""
+        <div style="
+            margin-top: 0.55rem;
+            color: {color_detalle};
+            font-size: 0.95rem;
+            line-height: 1.25;
+            white-space: normal;
+            word-break: break-word;
+        ">
+            {detalle}
+        </div>
+        """
+
+    st.markdown(
+        f"""
+        <div style="
+            border: 1px solid {borde};
+            background: {fondo};
+            border-radius: 0.55rem;
+            padding: 0.85rem 0.9rem;
+            min-height: 132px;
+            overflow: visible;
+            margin-bottom: 1rem;
+        ">
+            <div style="
+                font-size: 0.92rem;
+                font-weight: 700;
+                margin-bottom: 0.45rem;
+                color: inherit;
+                white-space: normal;
+            ">
+                {titulo}
+            </div>
+
+            <div style="
+                font-size: 1.75rem;
+                font-weight: 600;
+                line-height: 1.15;
+                white-space: normal;
+                word-break: break-word;
+                overflow-wrap: anywhere;
+            ">
+                {valor}
+            </div>
+
+            {detalle_html}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 # =====================================================
@@ -836,6 +950,11 @@ ultimo_fecha, ultimo_operador = obtener_ultimo_registro(df_f)
 tulipa_critica, intervenciones_criticas = obtener_tulipa_mas_critica(df_f)
 promedio_goma = calcular_promedio_cambio_goma(df_f)
 
+operador_menos_registros, cantidad_menos_registros = obtener_operador_menos_registros(
+    df_f,
+    operadores_sel
+)
+
 m1, m2, m3, m4, m5 = st.columns(5)
 
 with m1:
@@ -857,34 +976,52 @@ with m5:
     promedio = len(df_f) / max(df_f["Fecha"].nunique(), 1)
     st.metric("Registros por día", f"{promedio:.1f}")
 
-m6, m7, m8 = st.columns(3)
+k1, k2 = st.columns(2)
 
-with m6:
-    st.metric(
+with k1:
+    tarjeta_kpi(
         "Último registro",
         ultimo_fecha,
         f"Operador: {ultimo_operador}"
     )
 
-with m7:
-    st.metric(
+with k2:
+    tarjeta_kpi(
         "Tulipa más crítica",
         tulipa_critica,
-        f"{intervenciones_criticas} intervenciones"
+        f"{intervenciones_criticas} intervenciones",
+        alerta=True
     )
 
-with m8:
+k3, k4 = st.columns(2)
+
+with k3:
     if promedio_goma is None:
-        st.metric(
+        tarjeta_kpi(
             "Cambio promedio de goma",
             "Sin historial",
-            "Se requieren registros repetidos"
+            "Se requieren registros repetidos por tulipa"
         )
     else:
-        st.metric(
+        tarjeta_kpi(
             "Cambio promedio de goma",
             f"{promedio_goma:.1f} días",
-            "Promedio por tulipa"
+            "Promedio por tulipa con registros repetidos"
+        )
+
+with k4:
+    if cantidad_menos_registros == 0:
+        tarjeta_kpi(
+            "Operador con menos registros",
+            operador_menos_registros,
+            "No registra intervenciones con los filtros actuales",
+            alerta=True
+        )
+    else:
+        tarjeta_kpi(
+            "Operador con menos registros",
+            operador_menos_registros,
+            f"{cantidad_menos_registros} registros"
         )
 
 st.markdown("---")
