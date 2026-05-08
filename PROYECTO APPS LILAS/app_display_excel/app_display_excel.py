@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import re
+import plotly.express as px
 
 st.set_page_config(page_title="Visor Excel L2", layout="wide")
 
-st.title("Visor y filtro de archivos Excel")
+st.title("Visor y análisis de archivos Excel")
 
 archivo = st.file_uploader(
     "Sube tu archivo Excel",
@@ -338,40 +339,196 @@ if archivo is not None:
                             "Usa el filtro de texto."
                         )
 
-        st.subheader("Datos filtrados")
-
-        st.write(
-            f"Filas con solo filtro L2: **{filas_solo_l2}**"
+        tab_display, tab_analisis = st.tabs(
+            [
+                "Display filtrado",
+                "Análisis de data filtrada"
+            ]
         )
 
-        st.write(
-            f"Filas filtradas finales: **{df_filtrado.shape[0]}** | "
-            f"Columnas mostradas: **{len(columnas_visibles)}**"
-        )
+        with tab_display:
+            st.subheader("Datos filtrados")
 
-        if columnas_visibles:
-            st.dataframe(
-                df_filtrado[columnas_visibles],
-                use_container_width=True,
-                height=700
+            st.write(
+                f"Filas con solo filtro L2: **{filas_solo_l2}**"
             )
 
-            csv = df_filtrado[columnas_visibles].to_csv(
-                index=False
-            ).encode("utf-8-sig")
-
-            st.download_button(
-                label="Descargar datos filtrados en CSV",
-                data=csv,
-                file_name="datos_filtrados_L2.csv",
-                mime="text/csv"
+            st.write(
+                f"Filas filtradas finales: **{df_filtrado.shape[0]}** | "
+                f"Columnas mostradas: **{len(columnas_visibles)}**"
             )
-        else:
-            st.warning("Selecciona al menos una columna para mostrar.")
+
+            if columnas_visibles:
+                st.dataframe(
+                    df_filtrado[columnas_visibles],
+                    use_container_width=True,
+                    height=700
+                )
+
+                csv = df_filtrado[columnas_visibles].to_csv(
+                    index=False
+                ).encode("utf-8-sig")
+
+                st.download_button(
+                    label="Descargar datos filtrados en CSV",
+                    data=csv,
+                    file_name="datos_filtrados_L2.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.warning("Selecciona al menos una columna para mostrar.")
+
+        with tab_analisis:
+            st.subheader("Análisis de la data filtrada")
+
+            if df_filtrado.empty:
+                st.warning("No hay datos para analizar con los filtros actuales.")
+            else:
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    st.metric("Filas filtradas", df_filtrado.shape[0])
+
+                with col2:
+                    st.metric("Columnas", df_filtrado.shape[1])
+
+                with col3:
+                    porcentaje = (df_filtrado.shape[0] / df.shape[0]) * 100
+                    st.metric("% del total original", f"{porcentaje:.2f}%")
+
+                st.divider()
+
+                st.subheader("Histograma")
+
+                columnas_numericas = df_filtrado.select_dtypes(
+                    include=["number"]
+                ).columns.tolist()
+
+                if columnas_numericas:
+                    columna_histograma = st.selectbox(
+                        "Selecciona columna numérica para histograma",
+                        options=columnas_numericas,
+                        index=0
+                    )
+
+                    bins = st.slider(
+                        "Cantidad de intervalos",
+                        min_value=5,
+                        max_value=50,
+                        value=15
+                    )
+
+                    fig_hist = px.histogram(
+                        df_filtrado,
+                        x=columna_histograma,
+                        nbins=bins,
+                        title=f"Histograma de {columna_histograma}"
+                    )
+
+                    fig_hist.update_layout(
+                        xaxis_title=columna_histograma,
+                        yaxis_title="Cantidad",
+                        bargap=0.05
+                    )
+
+                    st.plotly_chart(
+                        fig_hist,
+                        use_container_width=True
+                    )
+                else:
+                    st.info("No hay columnas numéricas disponibles para histograma.")
+
+                st.divider()
+
+                st.subheader("Gráfico de barras verticales porcentuales")
+
+                columnas_categoricas = [
+                    col for col in df_filtrado.columns
+                    if col not in columnas_numericas
+                ]
+
+                if columnas_categoricas:
+                    columna_barra = st.selectbox(
+                        "Selecciona columna categórica para gráfico porcentual",
+                        options=columnas_categoricas,
+                        index=columnas_categoricas.index("Maquina")
+                        if "Maquina" in columnas_categoricas
+                        else 0
+                    )
+
+                    top_n = st.slider(
+                        "Mostrar Top N categorías",
+                        min_value=3,
+                        max_value=30,
+                        value=10
+                    )
+
+                    conteo = (
+                        df_filtrado[columna_barra]
+                        .fillna("Sin dato")
+                        .astype(str)
+                        .value_counts()
+                        .reset_index()
+                    )
+
+                    conteo.columns = [columna_barra, "Cantidad"]
+
+                    conteo["Porcentaje"] = (
+                        conteo["Cantidad"] / conteo["Cantidad"].sum()
+                    ) * 100
+
+                    conteo_top = conteo.head(top_n)
+
+                    fig_barra = px.bar(
+                        conteo_top,
+                        x=columna_barra,
+                        y="Porcentaje",
+                        text=conteo_top["Porcentaje"].map(lambda x: f"{x:.1f}%"),
+                        title=f"Distribución porcentual por {columna_barra}"
+                    )
+
+                    fig_barra.update_layout(
+                        xaxis_title=columna_barra,
+                        yaxis_title="Porcentaje (%)",
+                        xaxis_tickangle=-45
+                    )
+
+                    fig_barra.update_traces(
+                        textposition="outside"
+                    )
+
+                    st.plotly_chart(
+                        fig_barra,
+                        use_container_width=True
+                    )
+
+                    st.subheader("Tabla de frecuencias")
+
+                    st.dataframe(
+                        conteo,
+                        use_container_width=True,
+                        height=400
+                    )
+                else:
+                    st.info("No hay columnas categóricas disponibles para gráfico de barras.")
+
+                st.divider()
+
+                st.subheader("Resumen de columnas numéricas")
+
+                if columnas_numericas:
+                    resumen_numerico = df_filtrado[columnas_numericas].describe().T
+
+                    st.dataframe(
+                        resumen_numerico,
+                        use_container_width=True
+                    )
+                else:
+                    st.info("No hay columnas numéricas para resumir.")
 
     except ImportError:
-        st.error("Falta instalar openpyxl.")
-        st.code("pip install openpyxl")
+        st.error("Falta instalar alguna librería necesaria.")
+        st.code("pip install streamlit pandas openpyxl plotly")
 
     except Exception as e:
         st.error("No se pudo cargar el archivo Excel.")
