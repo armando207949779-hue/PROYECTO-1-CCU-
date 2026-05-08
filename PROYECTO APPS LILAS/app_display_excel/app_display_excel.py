@@ -64,6 +64,74 @@ def filtrar_texto(df_base, columna, texto, tipo_filtro):
     return df_base
 
 
+def filtro_checkboxes_vertical(
+    titulo,
+    valores,
+    key_prefix,
+    activar_por_defecto=True,
+    max_valores=300
+):
+    st.markdown(f"**{titulo}**")
+
+    valores = [str(v) for v in valores if pd.notna(v)]
+    valores = sorted(list(set(valores)))
+
+    texto_buscar = st.text_input(
+        "Buscar en listado",
+        key=f"buscar_{key_prefix}"
+    )
+
+    if texto_buscar:
+        valores_mostrar = [
+            v for v in valores
+            if texto_buscar.lower() in v.lower()
+        ]
+    else:
+        valores_mostrar = valores
+
+    if len(valores_mostrar) > max_valores:
+        st.warning(
+            f"Hay {len(valores_mostrar)} valores. "
+            f"Se muestran solo los primeros {max_valores}. "
+            "Usa el buscador para reducir el listado."
+        )
+        valores_mostrar = valores_mostrar[:max_valores]
+
+    col_a, col_b = st.columns(2)
+
+    with col_a:
+        seleccionar_todos = st.checkbox(
+            "Seleccionar todos",
+            value=activar_por_defecto,
+            key=f"todos_{key_prefix}"
+        )
+
+    with col_b:
+        limpiar_todos = st.checkbox(
+            "Limpiar todos",
+            value=False,
+            key=f"limpiar_{key_prefix}"
+        )
+
+    seleccionados = []
+
+    for valor in valores_mostrar:
+        valor_key = re.sub(r"[^A-Za-z0-9_]", "_", valor)
+
+        checked_default = seleccionar_todos and not limpiar_todos
+
+        marcado = st.checkbox(
+            valor,
+            value=checked_default,
+            key=f"chk_{key_prefix}_{valor_key}"
+        )
+
+        if marcado:
+            seleccionados.append(valor)
+
+    return seleccionados
+
+
 if archivo is not None:
     try:
         excel = pd.ExcelFile(archivo, engine="openpyxl")
@@ -97,11 +165,24 @@ if archivo is not None:
 
         st.sidebar.header("Opciones de visualización")
 
-        columnas_visibles = st.sidebar.multiselect(
-            "Columnas a mostrar",
-            options=list(df.columns),
-            default=list(df.columns)
-        )
+        with st.sidebar.expander("Columnas a mostrar", expanded=False):
+            columnas_visibles = []
+
+            marcar_todas_columnas = st.checkbox(
+                "Mostrar todas las columnas",
+                value=True,
+                key="mostrar_todas_columnas"
+            )
+
+            for columna in df.columns:
+                mostrar = st.checkbox(
+                    columna,
+                    value=marcar_todas_columnas,
+                    key=f"mostrar_columna_{columna}"
+                )
+
+                if mostrar:
+                    columnas_visibles.append(columna)
 
         st.sidebar.header("Filtro predeterminado L2")
 
@@ -143,16 +224,7 @@ if archivo is not None:
             f"Filas después del filtro L2: {filas_solo_l2}"
         )
 
-        st.sidebar.header("Filtrar máquinas dentro de L2")
-
-        maquinas_l2 = (
-            df_filtrado["Maquina"]
-            .dropna()
-            .astype(str)
-            .sort_values()
-            .unique()
-            .tolist()
-        )
+        st.sidebar.header("Máquinas dentro de L2")
 
         usar_filtro_maquinas = st.sidebar.checkbox(
             "Filtrar por máquinas específicas",
@@ -160,15 +232,28 @@ if archivo is not None:
         )
 
         if usar_filtro_maquinas:
-            maquinas_seleccionadas = st.sidebar.multiselect(
-                "Máquinas L2 disponibles",
-                options=maquinas_l2,
-                default=maquinas_l2
-            )
+            with st.sidebar.expander("Listado de máquinas L2", expanded=True):
+                maquinas_l2 = (
+                    df_filtrado["Maquina"]
+                    .dropna()
+                    .astype(str)
+                    .sort_values()
+                    .unique()
+                    .tolist()
+                )
+
+                maquinas_seleccionadas = filtro_checkboxes_vertical(
+                    titulo="Máquinas disponibles",
+                    valores=maquinas_l2,
+                    key_prefix="maquinas_l2",
+                    activar_por_defecto=True
+                )
 
             if maquinas_seleccionadas:
                 df_filtrado = df_filtrado[
-                    df_filtrado["Maquina"].astype(str).isin(maquinas_seleccionadas)
+                    df_filtrado["Maquina"]
+                    .astype(str)
+                    .isin(maquinas_seleccionadas)
                 ]
             else:
                 df_filtrado = df_filtrado.iloc[0:0]
@@ -200,11 +285,18 @@ if archivo is not None:
 
         st.sidebar.header("Filtros adicionales")
 
-        columnas_para_filtrar = st.sidebar.multiselect(
-            "Columnas adicionales a filtrar",
-            options=list(df.columns),
-            default=[]
-        )
+        with st.sidebar.expander("Seleccionar columnas para filtrar", expanded=False):
+            columnas_para_filtrar = []
+
+            for columna in df.columns:
+                usar_columna = st.checkbox(
+                    columna,
+                    value=False,
+                    key=f"usar_filtro_columna_{columna}"
+                )
+
+                if usar_columna:
+                    columnas_para_filtrar.append(columna)
 
         opciones_texto = [
             "Contiene",
@@ -291,7 +383,7 @@ if archivo is not None:
 
                 else:
                     tipo_filtro_texto = st.selectbox(
-                        "Tipo de filtro",
+                        "Tipo de filtro de texto",
                         options=opciones_texto,
                         index=0,
                         key=f"tipo_texto_adicional_{columna}"
@@ -319,25 +411,28 @@ if archivo is not None:
                         .tolist()
                     )
 
-                    if len(valores) <= 500:
-                        seleccion = st.multiselect(
-                            "Valores",
-                            options=valores,
-                            default=valores,
-                            key=f"valores_adicional_{columna}"
+                    aplicar_listado = st.checkbox(
+                        "Aplicar filtro por listado con checkboxes",
+                        value=False,
+                        key=f"aplicar_listado_{columna}"
+                    )
+
+                    if aplicar_listado:
+                        seleccion = filtro_checkboxes_vertical(
+                            titulo=f"Valores de {columna}",
+                            valores=valores,
+                            key_prefix=f"valores_{columna}",
+                            activar_por_defecto=True
                         )
 
                         if seleccion:
                             df_filtrado = df_filtrado[
-                                df_filtrado[columna].astype(str).isin(seleccion)
+                                df_filtrado[columna]
+                                .astype(str)
+                                .isin(seleccion)
                             ]
                         else:
                             df_filtrado = df_filtrado.iloc[0:0]
-                    else:
-                        st.caption(
-                            "Esta columna tiene más de 500 valores únicos. "
-                            "Usa el filtro de texto."
-                        )
 
         tab_display, tab_analisis = st.tabs(
             [
@@ -449,7 +544,7 @@ if archivo is not None:
 
                 if columnas_categoricas:
                     columna_barra = st.selectbox(
-                        "Selecciona columna categórica para gráfico porcentual",
+                        "Selecciona columna categórica",
                         options=columnas_categoricas,
                         index=columnas_categoricas.index("Maquina")
                         if "Maquina" in columnas_categoricas
@@ -510,7 +605,7 @@ if archivo is not None:
                         height=400
                     )
                 else:
-                    st.info("No hay columnas categóricas disponibles para gráfico de barras.")
+                    st.info("No hay columnas categóricas disponibles.")
 
                 st.divider()
 
