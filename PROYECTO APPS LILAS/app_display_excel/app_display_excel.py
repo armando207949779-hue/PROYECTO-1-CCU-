@@ -116,7 +116,7 @@ def crear_zip_por_maquina(df_descarga):
 
         for maquina in maquinas:
             df_maquina = df_descarga[
-                df_descarga["Maquina"].astype(str) == maquina
+                df_descarga["Maquina"].astype(str) == str(maquina)
             ]
 
             nombre_limpio = limpiar_nombre_archivo(maquina)
@@ -194,17 +194,13 @@ def filtro_checkboxes_vertical(
     return seleccionados
 
 
-def crear_nombre_foto(id_estandar, maquina, detalle_maquina, nombre_original):
+def crear_nombre_foto(id_estandar, maquina, nombre_original):
     extension = os.path.splitext(nombre_original)[1].lower()
 
     id_limpio = limpiar_nombre_archivo(id_estandar)
     maquina_limpia = limpiar_nombre_archivo(maquina)
-    detalle_limpio = limpiar_nombre_archivo(detalle_maquina)
 
-    if detalle_limpio and detalle_limpio.lower() != "nan":
-        nombre = f"ID_{id_limpio}_{maquina_limpia}_{detalle_limpio}{extension}"
-    else:
-        nombre = f"ID_{id_limpio}_{maquina_limpia}{extension}"
+    nombre = f"{id_limpio}_{maquina_limpia}{extension}"
 
     return nombre
 
@@ -217,13 +213,12 @@ def crear_zip_fotos_por_maquina(fotos_configuradas):
             archivo_foto = item["archivo"]
             id_estandar = item["id_estandar"]
             maquina = item["maquina"]
-            detalle_maquina = item["detalle_maquina"]
 
             carpeta_maquina = limpiar_nombre_archivo(maquina)
+
             nombre_foto = crear_nombre_foto(
                 id_estandar=id_estandar,
                 maquina=maquina,
-                detalle_maquina=detalle_maquina,
                 nombre_original=archivo_foto.name
             )
 
@@ -764,9 +759,8 @@ if archivo is not None:
             st.subheader("Subir fotos y asociarlas con ID / Máquina")
 
             st.write(
-                "Las fotos se renombran automáticamente con el formato: "
-                "**ID_Maquina_DetalleMaquina.extensión** "
-                "y se descargan en un ZIP con carpetas por máquina."
+                "Cada foto se renombra automáticamente con el formato "
+                "**ID_Maquina.extensión** y se descarga en un ZIP con carpetas por máquina."
             )
 
             if df_filtrado.empty:
@@ -775,6 +769,7 @@ if archivo is not None:
                 df_ids = df_filtrado.copy()
 
                 df_ids["Id Estándar"] = df_ids["Id Estándar"].astype(str)
+                df_ids["Maquina"] = df_ids["Maquina"].astype(str)
 
                 columnas_info = ["Id Estándar", "Maquina"]
 
@@ -784,6 +779,9 @@ if archivo is not None:
                 if "Descripción Estándar Visual" in df_ids.columns:
                     columnas_info.append("Descripción Estándar Visual")
 
+                if "Descripción Actividad" in df_ids.columns:
+                    columnas_info.append("Descripción Actividad")
+
                 df_opciones = (
                     df_ids[columnas_info]
                     .drop_duplicates()
@@ -791,7 +789,10 @@ if archivo is not None:
                     .reset_index(drop=True)
                 )
 
-                st.write(f"IDs disponibles según filtros actuales: **{df_opciones.shape[0]}**")
+                st.write(
+                    f"IDs disponibles según filtros actuales: "
+                    f"**{df_opciones.shape[0]}**"
+                )
 
                 with st.expander("Ver IDs disponibles", expanded=False):
                     st.dataframe(
@@ -809,7 +810,14 @@ if archivo is not None:
                 if fotos_subidas:
                     st.subheader("Asociar cada foto")
 
-                    ids_disponibles = df_opciones["Id Estándar"].astype(str).tolist()
+                    maquinas_disponibles = (
+                        df_opciones["Maquina"]
+                        .dropna()
+                        .astype(str)
+                        .value_counts()
+                        .index
+                        .tolist()
+                    )
 
                     fotos_configuradas = []
 
@@ -826,42 +834,74 @@ if archivo is not None:
                             )
 
                         with col_config:
+                            maquina_seleccionada = st.selectbox(
+                                f"Selecciona máquina para: {foto.name}",
+                                options=maquinas_disponibles,
+                                key=f"maquina_foto_{idx}_{foto.name}"
+                            )
+
+                            df_ids_maquina = df_opciones[
+                                df_opciones["Maquina"].astype(str)
+                                == str(maquina_seleccionada)
+                            ].copy()
+
+                            ids_disponibles = (
+                                df_ids_maquina["Id Estándar"]
+                                .astype(str)
+                                .sort_values()
+                                .unique()
+                                .tolist()
+                            )
+
                             id_seleccionado = st.selectbox(
                                 f"Selecciona ID para: {foto.name}",
                                 options=ids_disponibles,
                                 key=f"id_foto_{idx}_{foto.name}"
                             )
 
-                            fila_id = df_opciones[
-                                df_opciones["Id Estándar"].astype(str) == str(id_seleccionado)
+                            fila_id = df_ids_maquina[
+                                df_ids_maquina["Id Estándar"].astype(str)
+                                == str(id_seleccionado)
                             ].iloc[0]
-
-                            maquina = str(fila_id["Maquina"])
-
-                            if "Detalle Maquina" in df_opciones.columns:
-                                detalle_maquina = str(fila_id["Detalle Maquina"])
-                            else:
-                                detalle_maquina = ""
 
                             nombre_final = crear_nombre_foto(
                                 id_estandar=id_seleccionado,
-                                maquina=maquina,
-                                detalle_maquina=detalle_maquina,
+                                maquina=maquina_seleccionada,
                                 nombre_original=foto.name
                             )
 
-                            carpeta_final = limpiar_nombre_archivo(maquina)
+                            carpeta_final = limpiar_nombre_archivo(
+                                maquina_seleccionada
+                            )
 
-                            st.write(f"**Máquina:** {maquina}")
+                            st.write(f"**ID seleccionado:** {id_seleccionado}")
+                            st.write(f"**Máquina seleccionada:** {maquina_seleccionada}")
                             st.write(f"**Carpeta:** `{carpeta_final}/`")
                             st.write(f"**Nombre final:** `{nombre_final}`")
+
+                            if "Detalle Maquina" in df_ids_maquina.columns:
+                                st.write(
+                                    f"**Detalle Máquina:** "
+                                    f"{fila_id.get('Detalle Maquina', '')}"
+                                )
+
+                            if "Descripción Estándar Visual" in df_ids_maquina.columns:
+                                st.write(
+                                    f"**Descripción Estándar Visual:** "
+                                    f"{fila_id.get('Descripción Estándar Visual', '')}"
+                                )
+
+                            if "Descripción Actividad" in df_ids_maquina.columns:
+                                st.write(
+                                    f"**Descripción Actividad:** "
+                                    f"{fila_id.get('Descripción Actividad', '')}"
+                                )
 
                             fotos_configuradas.append(
                                 {
                                     "archivo": foto,
                                     "id_estandar": id_seleccionado,
-                                    "maquina": maquina,
-                                    "detalle_maquina": detalle_maquina,
+                                    "maquina": maquina_seleccionada,
                                     "nombre_final": nombre_final,
                                     "carpeta": carpeta_final
                                 }
@@ -875,7 +915,6 @@ if archivo is not None:
                                 "Foto original": item["archivo"].name,
                                 "Id Estándar": item["id_estandar"],
                                 "Maquina": item["maquina"],
-                                "Detalle Maquina": item["detalle_maquina"],
                                 "Carpeta": item["carpeta"],
                                 "Nombre final": item["nombre_final"]
                             }
@@ -898,7 +937,7 @@ if archivo is not None:
                     )
 
                 else:
-                    st.info("Sube fotos para asociarlas con un ID.")
+                    st.info("Sube fotos para asociarlas con una máquina y un ID.")
 
     except ImportError:
         st.error("Falta instalar alguna librería necesaria.")
