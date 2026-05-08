@@ -1,6 +1,6 @@
 """
 Portal Global CCU
-App principal para navegar entre dashboards de Línea 2 y Línea 11.
+App principal para navegar entre dashboards y formularios de Línea 2 y Línea 11.
 Incluye pestaña de alertas por falta de registros recientes y descarga PDF.
 
 Ubicación:
@@ -27,10 +27,17 @@ PROJECT_DIR = BASE_DIR.parent
 
 LOGO_PATH = PROJECT_DIR / "assets" / "CCU_logo_(2018).svg.png"
 
+# Dashboards
 APP_L2_TULIPAS = PROJECT_DIR / "DASHBOARD L2 TULIPAS" / "app13.py"
 APP_L2_VALVULAS = PROJECT_DIR / "DASHBOARD L2 VALVULAS" / "app13.py"
 APP_L11_TULIPAS = PROJECT_DIR / "DASHBOARD L11 TULIPAS" / "app9.py"
 APP_L11_VALVULAS = PROJECT_DIR / "DASHBOARD L11 VALVULAS" / "app14.py"
+
+# Formularios
+FORM_L2_TULIPAS = PROJECT_DIR / "FORMULARIO L2 TULIPAS" / "app7.py"
+FORM_L2_VALVULAS = PROJECT_DIR / "FORMULARIO L2 VALVULAS" / "app6.py"
+FORM_L11_TULIPAS = PROJECT_DIR / "FORMULARIO L11 TULIPAS" / "app.py"
+FORM_L11_VALVULAS = PROJECT_DIR / "FORMULARIO L11 VALVULAS" / "app7.py"
 
 
 # =====================================================
@@ -455,7 +462,7 @@ def generar_pdf_alertas(df_alertas, umbral_global):
     story.append(Paragraph("Reporte de Alertas - Dashboards CCU", title_style))
     story.append(
         Paragraph(
-            f"Generado: {fecha_reporte} | Umbral global: {umbral_global} dias sin registro",
+            f"Generado: {fecha_reporte} | Umbral global: {umbral_global} días sin registro",
             subtitle_style
         )
     )
@@ -491,12 +498,12 @@ def generar_pdf_alertas(df_alertas, umbral_global):
     story.append(Spacer(1, 0.35 * cm))
 
     columnas = [
-        "Linea",
+        "Línea",
         "Dashboard",
         "Estado",
-        "Ultimo registro",
-        "Ultimo operador",
-        "Dias",
+        "Último registro",
+        "Último operador",
+        "Días",
         "Umbral",
         "Registros",
     ]
@@ -579,7 +586,7 @@ def generar_pdf_alertas(df_alertas, umbral_global):
 
     story.append(
         Paragraph(
-            "Criterio: se genera alerta cuando los dias sin registro son mayores al umbral configurado.",
+            "Criterio: se genera alerta cuando los días sin registro son mayores al umbral configurado.",
             normal_style
         )
     )
@@ -606,7 +613,7 @@ def pagina_inicio():
                 Portal Área de Operaciones CCU
             </h1>
             <p style='font-size:18px; opacity:0.75; margin-top:0.4rem;'>
-                Selecciona un dashboard desde el menú lateral para revisar análisis de tulipas y válvulas.
+                Selecciona un dashboard o formulario desde el menú lateral.
             </p>
         </div>
         """,
@@ -614,6 +621,8 @@ def pagina_inicio():
     )
 
     st.markdown("---")
+
+    st.markdown("## Dashboards")
 
     col1, col2 = st.columns(2)
 
@@ -623,9 +632,6 @@ def pagina_inicio():
             **Línea 2 · Tulipas**
 
             Dashboard de análisis para Encajonadora / Desencajonadora Línea 2.
-
-            Incluye mapas por ubicación física, KPIs, tendencia temporal,
-            registros por turno, operador, formato y mantención.
             """
         )
 
@@ -635,9 +641,6 @@ def pagina_inicio():
             **Línea 2 · Válvulas**
 
             Dashboard de mantenimiento de válvulas Krones Línea 2.
-
-            Incluye estado global de válvulas, KPIs, tendencia temporal,
-            análisis por turno, operador y tipo de mantención.
             """
         )
 
@@ -649,9 +652,6 @@ def pagina_inicio():
             **Línea 11 · Tulipas**
 
             Dashboard de análisis para Encajonadora / Desencajonadora Línea 11.
-
-            Incluye análisis por formato, cabezal, tulipa, equipo,
-            operador, turno y tipo de mantención.
             """
         )
 
@@ -661,15 +661,36 @@ def pagina_inicio():
             **Línea 11 · Válvulas**
 
             Dashboard de mantenimiento de válvulas Krones Línea 11.
-
-            Incluye estado global de 152 válvulas, KPIs, registros por turno,
-            operador, tipo de mantención y datos detallados.
             """
         )
 
     st.markdown("---")
 
-    st.caption("Portal central conectado a dashboards Streamlit del repositorio GitHub.")
+    st.markdown("## Formularios")
+
+    f1, f2 = st.columns(2)
+
+    with f1:
+        st.success(
+            """
+            **Formularios Línea 2**
+
+            Registro operacional para tulipas y válvulas.
+            """
+        )
+
+    with f2:
+        st.success(
+            """
+            **Formularios Línea 11**
+
+            Registro operacional para tulipas y válvulas.
+            """
+        )
+
+    st.markdown("---")
+
+    st.caption("Portal central conectado a dashboards y formularios Streamlit del repositorio GitHub.")
 
 
 # =====================================================
@@ -888,10 +909,17 @@ def pagina_alertas():
 # =====================================================
 
 apps_requeridas = {
-    "Línea 2 · Tulipas": APP_L2_TULIPAS,
-    "Línea 2 · Válvulas": APP_L2_VALVULAS,
-    "Línea 11 · Tulipas": APP_L11_TULIPAS,
-    "Línea 11 · Válvulas": APP_L11_VALVULAS,
+    # Dashboards
+    "Dashboard Línea 2 · Tulipas": APP_L2_TULIPAS,
+    "Dashboard Línea 2 · Válvulas": APP_L2_VALVULAS,
+    "Dashboard Línea 11 · Tulipas": APP_L11_TULIPAS,
+    "Dashboard Línea 11 · Válvulas": APP_L11_VALVULAS,
+
+    # Formularios
+    "Formulario Línea 2 · Tulipas": FORM_L2_TULIPAS,
+    "Formulario Línea 2 · Válvulas": FORM_L2_VALVULAS,
+    "Formulario Línea 11 · Tulipas": FORM_L11_TULIPAS,
+    "Formulario Línea 11 · Válvulas": FORM_L11_VALVULAS,
 }
 
 apps_faltantes = {
@@ -919,7 +947,7 @@ if apps_faltantes:
 
 
 # =====================================================
-# NAVEGACIÓN ENTRE DASHBOARDS
+# NAVEGACIÓN ENTRE DASHBOARDS Y FORMULARIOS
 # =====================================================
 
 pagina = st.navigation(
@@ -938,32 +966,60 @@ pagina = st.navigation(
                 url_path="alertas"
             ),
         ],
-        "Línea 2": [
+        "Dashboards · Línea 2": [
             st.Page(
                 APP_L2_TULIPAS,
                 title="Tulipas",
-                icon="🧩",
-                url_path="linea-2-tulipas"
+                icon="📊",
+                url_path="dashboard-linea-2-tulipas"
             ),
             st.Page(
                 APP_L2_VALVULAS,
                 title="Válvulas",
-                icon="⚙️",
-                url_path="linea-2-valvulas"
+                icon="📊",
+                url_path="dashboard-linea-2-valvulas"
             ),
         ],
-        "Línea 11": [
+        "Dashboards · Línea 11": [
             st.Page(
                 APP_L11_TULIPAS,
                 title="Tulipas",
-                icon="🧩",
-                url_path="linea-11-tulipas"
+                icon="📊",
+                url_path="dashboard-linea-11-tulipas"
             ),
             st.Page(
                 APP_L11_VALVULAS,
                 title="Válvulas",
-                icon="⚙️",
-                url_path="linea-11-valvulas"
+                icon="📊",
+                url_path="dashboard-linea-11-valvulas"
+            ),
+        ],
+        "Formularios · Línea 2": [
+            st.Page(
+                FORM_L2_TULIPAS,
+                title="Tulipas",
+                icon="📝",
+                url_path="formulario-linea-2-tulipas"
+            ),
+            st.Page(
+                FORM_L2_VALVULAS,
+                title="Válvulas",
+                icon="📝",
+                url_path="formulario-linea-2-valvulas"
+            ),
+        ],
+        "Formularios · Línea 11": [
+            st.Page(
+                FORM_L11_TULIPAS,
+                title="Tulipas",
+                icon="📝",
+                url_path="formulario-linea-11-tulipas"
+            ),
+            st.Page(
+                FORM_L11_VALVULAS,
+                title="Válvulas",
+                icon="📝",
+                url_path="formulario-linea-11-valvulas"
             ),
         ],
     },
