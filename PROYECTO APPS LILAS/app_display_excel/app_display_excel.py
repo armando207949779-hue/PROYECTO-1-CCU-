@@ -11,12 +11,13 @@ archivo = st.file_uploader(
     type=["xlsx", "xls"]
 )
 
-def filtrar_texto(df_base, columna, texto, tipo_filtro):
-    serie_texto = df_base[columna].astype(str).str.strip()
-    texto_limpio = texto.strip()
 
-    if not texto_limpio:
+def filtrar_texto(df_base, columna, texto, tipo_filtro):
+    if texto is None or str(texto).strip() == "":
         return df_base
+
+    serie_texto = df_base[columna].astype(str).str.strip()
+    texto_limpio = str(texto).strip()
 
     if tipo_filtro == "Contiene":
         patron = re.escape(texto_limpio)
@@ -82,16 +83,16 @@ if archivo is not None:
             for i, col in enumerate(df.columns)
         ]
 
-        st.write(
-            f"Filas originales: **{df.shape[0]}** | "
-            f"Columnas: **{df.shape[1]}**"
-        )
-
         if "Maquina" not in df.columns:
             st.error("No existe la columna 'Maquina' en el archivo Excel.")
             st.write("Columnas encontradas:")
             st.write(list(df.columns))
             st.stop()
+
+        st.write(
+            f"Filas originales: **{df.shape[0]}** | "
+            f"Columnas originales: **{df.shape[1]}**"
+        )
 
         st.sidebar.header("Opciones de visualización")
 
@@ -101,15 +102,15 @@ if archivo is not None:
             default=list(df.columns)
         )
 
-        st.sidebar.header("Filtro predeterminado")
+        st.sidebar.header("Filtro predeterminado L2")
 
-        activar_l2 = st.sidebar.checkbox(
-            "Aplicar filtro Maquina contiene L2",
+        aplicar_filtro_l2 = st.sidebar.checkbox(
+            "Aplicar filtro predeterminado: Maquina contiene L2",
             value=True
         )
 
         texto_l2 = st.sidebar.text_input(
-            "Texto predeterminado en Maquina",
+            "Texto predeterminado",
             value="L2"
         )
 
@@ -127,13 +128,19 @@ if archivo is not None:
 
         df_filtrado = df.copy()
 
-        if activar_l2 and texto_l2:
+        if aplicar_filtro_l2:
             df_filtrado = filtrar_texto(
                 df_filtrado,
                 "Maquina",
                 texto_l2,
                 tipo_l2
             )
+
+        filas_solo_l2 = df_filtrado.shape[0]
+
+        st.sidebar.info(
+            f"Filas después del filtro L2: {filas_solo_l2}"
+        )
 
         st.sidebar.header("Filtrar máquinas dentro de L2")
 
@@ -146,18 +153,28 @@ if archivo is not None:
             .tolist()
         )
 
-        maquinas_seleccionadas = st.sidebar.multiselect(
-            "Máquinas disponibles",
-            options=maquinas_l2,
-            default=maquinas_l2
+        usar_filtro_maquinas = st.sidebar.checkbox(
+            "Filtrar por máquinas específicas",
+            value=False
         )
 
-        if maquinas_seleccionadas:
-            df_filtrado = df_filtrado[
-                df_filtrado["Maquina"].astype(str).isin(maquinas_seleccionadas)
-            ]
+        if usar_filtro_maquinas:
+            maquinas_seleccionadas = st.sidebar.multiselect(
+                "Máquinas L2 disponibles",
+                options=maquinas_l2,
+                default=maquinas_l2
+            )
+
+            if maquinas_seleccionadas:
+                df_filtrado = df_filtrado[
+                    df_filtrado["Maquina"].astype(str).isin(maquinas_seleccionadas)
+                ]
+            else:
+                df_filtrado = df_filtrado.iloc[0:0]
         else:
-            df_filtrado = df_filtrado.iloc[0:0]
+            st.sidebar.caption(
+                "No se está aplicando filtro por máquinas específicas."
+            )
 
         st.sidebar.header("Buscador general")
 
@@ -180,7 +197,13 @@ if archivo is not None:
                 )
             ]
 
-        st.sidebar.header("Filtros por todas las columnas")
+        st.sidebar.header("Filtros adicionales")
+
+        columnas_para_filtrar = st.sidebar.multiselect(
+            "Columnas adicionales a filtrar",
+            options=list(df.columns),
+            default=[]
+        )
 
         opciones_texto = [
             "Contiene",
@@ -190,30 +213,25 @@ if archivo is not None:
             "Termina con"
         ]
 
-        for columna in df.columns:
-            if columna == "Maquina":
-                titulo_expander = "Filtro adicional: Maquina"
-            else:
-                titulo_expander = f"Filtrar: {columna}"
-
-            with st.sidebar.expander(titulo_expander, expanded=False):
-                serie_original = df[columna]
+        for columna in columnas_para_filtrar:
+            with st.sidebar.expander(f"Filtrar: {columna}", expanded=True):
+                serie_actual = df_filtrado[columna]
 
                 serie_fecha = pd.to_datetime(
-                    serie_original,
+                    serie_actual,
                     errors="coerce"
                 )
 
-                total_no_nulos = len(serie_original.dropna())
+                total_no_nulos = len(serie_actual.dropna())
 
                 es_fecha = (
                     total_no_nulos > 0
                     and serie_fecha.notna().sum() >= total_no_nulos * 0.7
                 )
 
-                if pd.api.types.is_numeric_dtype(serie_original):
-                    minimo = df_filtrado[columna].min()
-                    maximo = df_filtrado[columna].max()
+                if pd.api.types.is_numeric_dtype(serie_actual):
+                    minimo = serie_actual.min()
+                    maximo = serie_actual.max()
 
                     if pd.notna(minimo) and pd.notna(maximo):
                         minimo = float(minimo)
@@ -225,7 +243,7 @@ if archivo is not None:
                                 min_value=minimo,
                                 max_value=maximo,
                                 value=(minimo, maximo),
-                                key=f"rango_{columna}"
+                                key=f"rango_adicional_{columna}"
                             )
 
                             df_filtrado = df_filtrado[
@@ -252,7 +270,7 @@ if archivo is not None:
                             value=(fecha_min, fecha_max),
                             min_value=fecha_min,
                             max_value=fecha_max,
-                            key=f"fecha_{columna}"
+                            key=f"fecha_adicional_{columna}"
                         )
 
                         if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
@@ -275,12 +293,12 @@ if archivo is not None:
                         "Tipo de filtro",
                         options=opciones_texto,
                         index=0,
-                        key=f"tipo_texto_{columna}"
+                        key=f"tipo_texto_adicional_{columna}"
                     )
 
                     texto = st.text_input(
                         "Texto a filtrar",
-                        key=f"texto_{columna}"
+                        key=f"texto_adicional_{columna}"
                     )
 
                     if texto:
@@ -305,7 +323,7 @@ if archivo is not None:
                             "Valores",
                             options=valores,
                             default=valores,
-                            key=f"valores_{columna}"
+                            key=f"valores_adicional_{columna}"
                         )
 
                         if seleccion:
@@ -323,7 +341,11 @@ if archivo is not None:
         st.subheader("Datos filtrados")
 
         st.write(
-            f"Filas filtradas: **{df_filtrado.shape[0]}** | "
+            f"Filas con solo filtro L2: **{filas_solo_l2}**"
+        )
+
+        st.write(
+            f"Filas filtradas finales: **{df_filtrado.shape[0]}** | "
             f"Columnas mostradas: **{len(columnas_visibles)}**"
         )
 
