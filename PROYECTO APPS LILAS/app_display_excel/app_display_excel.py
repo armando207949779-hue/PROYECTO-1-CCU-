@@ -18,7 +18,10 @@ if archivo is not None:
         df = pd.read_excel(archivo, sheet_name=hoja, engine="openpyxl")
 
         # Mantener todas las columnas, incluso si tienen nombres vacíos
-        df.columns = [str(col) if str(col) != "nan" else f"Columna_{i+1}" for i, col in enumerate(df.columns)]
+        df.columns = [
+            str(col) if str(col) != "nan" else f"Columna_{i+1}"
+            for i, col in enumerate(df.columns)
+        ]
 
         st.write(f"Filas originales: **{df.shape[0]}** | Columnas: **{df.shape[1]}**")
 
@@ -34,7 +37,6 @@ if archivo is not None:
 
         df_filtrado = df.copy()
 
-        # Buscador general
         busqueda_general = st.sidebar.text_input("Buscar en toda la tabla")
 
         if busqueda_general:
@@ -45,101 +47,110 @@ if archivo is not None:
                 )
             ]
 
-        # Filtros por columna
-        columnas_para_filtrar = st.sidebar.multiselect(
-            "Selecciona columnas para filtrar",
-            options=list(df.columns)
-        )
+        # Ahora se crean filtros para TODAS las columnas por defecto
+        columnas_para_filtrar = list(df.columns)
 
         for columna in columnas_para_filtrar:
-            st.sidebar.markdown(f"**{columna}**")
+            with st.sidebar.expander(f"Filtrar: {columna}", expanded=False):
+                serie_original = df[columna]
+                serie_filtrada = df_filtrado[columna]
 
-            serie = df_filtrado[columna]
-
-            # Intentar detectar fechas
-            serie_fecha = pd.to_datetime(serie, errors="coerce")
-            es_fecha = serie_fecha.notna().sum() > 0 and serie_fecha.notna().sum() >= len(serie.dropna()) * 0.7
-
-            # Filtro para columnas numéricas
-            if pd.api.types.is_numeric_dtype(serie):
-                minimo = float(serie.min()) if pd.notna(serie.min()) else 0.0
-                maximo = float(serie.max()) if pd.notna(serie.max()) else 0.0
-
-                if minimo != maximo:
-                    rango = st.sidebar.slider(
-                        f"Rango de {columna}",
-                        min_value=minimo,
-                        max_value=maximo,
-                        value=(minimo, maximo)
-                    )
-
-                    df_filtrado = df_filtrado[
-                        (df_filtrado[columna] >= rango[0]) &
-                        (df_filtrado[columna] <= rango[1])
-                    ]
-
-            # Filtro para columnas tipo fecha
-            elif es_fecha:
-                fechas_validas = serie_fecha.dropna()
-
-                fecha_min = fechas_validas.min().date()
-                fecha_max = fechas_validas.max().date()
-
-                rango_fechas = st.sidebar.date_input(
-                    f"Rango de fechas de {columna}",
-                    value=(fecha_min, fecha_max),
-                    min_value=fecha_min,
-                    max_value=fecha_max
+                serie_fecha = pd.to_datetime(serie_original, errors="coerce")
+                es_fecha = (
+                    serie_fecha.notna().sum() > 0 and
+                    serie_fecha.notna().sum() >= len(serie_original.dropna()) * 0.7
                 )
 
-                if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
-                    inicio, fin = rango_fechas
+                if pd.api.types.is_numeric_dtype(serie_original):
+                    minimo = serie_original.min()
+                    maximo = serie_original.max()
 
-                    fechas_columna = pd.to_datetime(df_filtrado[columna], errors="coerce")
+                    if pd.notna(minimo) and pd.notna(maximo):
+                        minimo = float(minimo)
+                        maximo = float(maximo)
 
-                    df_filtrado = df_filtrado[
-                        (fechas_columna.dt.date >= inicio) &
-                        (fechas_columna.dt.date <= fin)
-                    ]
+                        if minimo != maximo:
+                            rango = st.slider(
+                                f"Rango",
+                                min_value=minimo,
+                                max_value=maximo,
+                                value=(minimo, maximo),
+                                key=f"rango_{columna}"
+                            )
 
-            # Filtro para texto / categorías
-            else:
-                valores = (
-                    df_filtrado[columna]
-                    .dropna()
-                    .astype(str)
-                    .sort_values()
-                    .unique()
-                    .tolist()
-                )
+                            df_filtrado = df_filtrado[
+                                (df_filtrado[columna] >= rango[0]) &
+                                (df_filtrado[columna] <= rango[1])
+                            ]
+                        else:
+                            st.caption(f"Valor único: {minimo}")
+                    else:
+                        st.caption("Columna numérica sin valores válidos.")
 
-                usar_busqueda = st.sidebar.text_input(
-                    f"Contiene texto en {columna}",
-                    key=f"texto_{columna}"
-                )
+                elif es_fecha:
+                    fechas_validas = serie_fecha.dropna()
 
-                if usar_busqueda:
-                    df_filtrado = df_filtrado[
-                        df_filtrado[columna]
-                        .astype(str)
-                        .str.contains(usar_busqueda, case=False, na=False)
-                    ]
+                    if not fechas_validas.empty:
+                        fecha_min = fechas_validas.min().date()
+                        fecha_max = fechas_validas.max().date()
 
-                if len(valores) <= 500:
-                    seleccion = st.sidebar.multiselect(
-                        f"Valores de {columna}",
-                        options=valores,
-                        default=valores,
-                        key=f"valores_{columna}"
-                    )
+                        rango_fechas = st.date_input(
+                            "Rango de fechas",
+                            value=(fecha_min, fecha_max),
+                            min_value=fecha_min,
+                            max_value=fecha_max,
+                            key=f"fecha_{columna}"
+                        )
 
-                    df_filtrado = df_filtrado[
-                        df_filtrado[columna].astype(str).isin(seleccion)
-                    ]
+                        if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
+                            inicio, fin = rango_fechas
+
+                            fechas_columna = pd.to_datetime(df_filtrado[columna], errors="coerce")
+
+                            df_filtrado = df_filtrado[
+                                (fechas_columna.dt.date >= inicio) &
+                                (fechas_columna.dt.date <= fin)
+                            ]
+                    else:
+                        st.caption("Columna de fecha sin valores válidos.")
+
                 else:
-                    st.sidebar.caption(
-                        f"{columna} tiene más de 500 valores únicos. Usa el filtro de texto."
+                    texto = st.text_input(
+                        "Contiene texto",
+                        key=f"texto_{columna}"
                     )
+
+                    if texto:
+                        df_filtrado = df_filtrado[
+                            df_filtrado[columna]
+                            .astype(str)
+                            .str.contains(texto, case=False, na=False)
+                        ]
+
+                    valores = (
+                        df[columna]
+                        .dropna()
+                        .astype(str)
+                        .sort_values()
+                        .unique()
+                        .tolist()
+                    )
+
+                    if len(valores) <= 500:
+                        seleccion = st.multiselect(
+                            "Valores",
+                            options=valores,
+                            default=valores,
+                            key=f"valores_{columna}"
+                        )
+
+                        df_filtrado = df_filtrado[
+                            df_filtrado[columna].astype(str).isin(seleccion)
+                        ]
+                    else:
+                        st.caption(
+                            "Esta columna tiene más de 500 valores únicos. Usa el filtro de texto."
+                        )
 
         st.subheader("Datos filtrados")
         st.write(f"Filas filtradas: **{df_filtrado.shape[0]}**")
@@ -150,18 +161,17 @@ if archivo is not None:
                 use_container_width=True,
                 height=650
             )
+
+            csv = df_filtrado[columnas_visibles].to_csv(index=False).encode("utf-8-sig")
+
+            st.download_button(
+                label="Descargar resultado filtrado en CSV",
+                data=csv,
+                file_name="datos_filtrados.csv",
+                mime="text/csv"
+            )
         else:
             st.warning("Selecciona al menos una columna para mostrar.")
-
-        # Descargar resultado filtrado
-        csv = df_filtrado[columnas_visibles].to_csv(index=False).encode("utf-8-sig")
-
-        st.download_button(
-            label="Descargar resultado filtrado en CSV",
-            data=csv,
-            file_name="datos_filtrados.csv",
-            mime="text/csv"
-        )
 
     except ImportError:
         st.error("Falta instalar openpyxl. Agrega openpyxl en requirements.txt.")
