@@ -2,275 +2,139 @@ import streamlit as st
 import pandas as pd
 import re
 
-st.set_page_config(page_title="Visor y filtro de Excel", layout="wide")
+st.set_page_config(page_title="Display Excel L2", layout="wide")
 
-st.title("Visor y filtro de archivos Excel")
+st.title("Display de archivo Excel - Filtro Maquina L2")
 
-archivo = st.file_uploader(
-    "Sube tu archivo Excel",
-    type=["xlsx", "xls"]
-)
+# Ruta local del archivo Excel
+ruta_excel = r"C:\Users\arman\Downloads\Listado_LILA_ESTANDAR (3).xlsx"
 
-if archivo is not None:
-    try:
-        excel = pd.ExcelFile(archivo, engine="openpyxl")
-        hoja = st.selectbox("Selecciona una hoja", excel.sheet_names)
+try:
+    # Leer archivo Excel
+    excel = pd.ExcelFile(ruta_excel, engine="openpyxl")
 
-        df = pd.read_excel(archivo, sheet_name=hoja, engine="openpyxl")
+    hoja = st.selectbox(
+        "Selecciona una hoja",
+        excel.sheet_names
+    )
 
-        df.columns = [
-            str(col).strip() if str(col) != "nan" else f"Columna_{i + 1}"
-            for i, col in enumerate(df.columns)
-        ]
+    df = pd.read_excel(
+        ruta_excel,
+        sheet_name=hoja,
+        engine="openpyxl"
+    )
 
-        st.write(
-            f"Filas originales: **{df.shape[0]}** | "
-            f"Columnas: **{df.shape[1]}**"
-        )
+    # Normalizar nombres de columnas
+    df.columns = [
+        str(col).strip() if str(col) != "nan" else f"Columna_{i + 1}"
+        for i, col in enumerate(df.columns)
+    ]
 
-        st.sidebar.header("Opciones de visualización")
+    # Verificar que exista la columna Maquina
+    if "Maquina" not in df.columns:
+        st.error("No existe la columna 'Maquina' en el archivo Excel.")
+        st.write("Columnas encontradas:")
+        st.write(list(df.columns))
+        st.stop()
 
-        columnas_visibles = st.sidebar.multiselect(
-            "Columnas a mostrar",
-            options=list(df.columns),
-            default=list(df.columns)
-        )
+    st.write(f"Archivo cargado: `{ruta_excel}`")
+    st.write(f"Filas originales: **{df.shape[0]}** | Columnas: **{df.shape[1]}**")
 
-        st.sidebar.header("Filtros")
+    st.sidebar.header("Filtros")
 
-        df_filtrado = df.copy()
+    # Valor por defecto del filtro
+    filtro_maquina = st.sidebar.text_input(
+        "Filtrar columna Maquina",
+        value="L2"
+    )
 
-        busqueda_general = st.sidebar.text_input("Buscar en toda la tabla")
+    tipo_filtro = st.sidebar.selectbox(
+        "Tipo de filtro Maquina",
+        options=[
+            "Contiene palabra exacta",
+            "Contiene",
+            "Igual a",
+            "Empieza con",
+            "Termina con"
+        ],
+        index=0
+    )
 
-        if busqueda_general:
-            patron_general = re.escape(busqueda_general.strip())
+    df_filtrado = df.copy()
+
+    if filtro_maquina:
+        serie_maquina = df_filtrado["Maquina"].astype(str).str.strip()
+        texto = filtro_maquina.strip()
+
+        if tipo_filtro == "Contiene palabra exacta":
+            patron = (
+                rf"(?<![A-Za-z0-9])"
+                rf"{re.escape(texto)}"
+                rf"(?![A-Za-z0-9])"
+            )
 
             df_filtrado = df_filtrado[
-                df_filtrado.astype(str).apply(
-                    lambda fila: fila.str.contains(
-                        patron_general,
-                        case=False,
-                        na=False,
-                        regex=True
-                    ).any(),
-                    axis=1
+                serie_maquina.str.contains(
+                    patron,
+                    case=False,
+                    na=False,
+                    regex=True
                 )
             ]
 
-        columnas_para_filtrar = list(df.columns)
+        elif tipo_filtro == "Contiene":
+            patron = re.escape(texto)
 
-        for columna in columnas_para_filtrar:
-            # Abrir por defecto el filtro Maquina
-            expandido = columna.strip().lower() == "maquina"
-
-            with st.sidebar.expander(f"Filtrar: {columna}", expanded=expandido):
-                serie_original = df[columna]
-
-                serie_fecha = pd.to_datetime(serie_original, errors="coerce")
-                total_no_nulos = len(serie_original.dropna())
-
-                es_fecha = (
-                    total_no_nulos > 0
-                    and serie_fecha.notna().sum() >= total_no_nulos * 0.7
+            df_filtrado = df_filtrado[
+                serie_maquina.str.contains(
+                    patron,
+                    case=False,
+                    na=False,
+                    regex=True
                 )
+            ]
 
-                if pd.api.types.is_numeric_dtype(serie_original):
-                    minimo = serie_original.min()
-                    maximo = serie_original.max()
+        elif tipo_filtro == "Igual a":
+            df_filtrado = df_filtrado[
+                serie_maquina.str.lower() == texto.lower()
+            ]
 
-                    if pd.notna(minimo) and pd.notna(maximo):
-                        minimo = float(minimo)
-                        maximo = float(maximo)
+        elif tipo_filtro == "Empieza con":
+            df_filtrado = df_filtrado[
+                serie_maquina.str.lower().str.startswith(texto.lower())
+            ]
 
-                        if minimo != maximo:
-                            rango = st.slider(
-                                "Rango",
-                                min_value=minimo,
-                                max_value=maximo,
-                                value=(minimo, maximo),
-                                key=f"rango_{columna}"
-                            )
+        elif tipo_filtro == "Termina con":
+            df_filtrado = df_filtrado[
+                serie_maquina.str.lower().str.endswith(texto.lower())
+            ]
 
-                            df_filtrado = df_filtrado[
-                                (df_filtrado[columna] >= rango[0])
-                                & (df_filtrado[columna] <= rango[1])
-                            ]
-                        else:
-                            st.caption(f"Valor único: {minimo}")
-                    else:
-                        st.caption("Columna numérica sin valores válidos.")
+    st.subheader("Datos filtrados")
+    st.write(f"Filas filtradas: **{df_filtrado.shape[0]}**")
 
-                elif es_fecha:
-                    fechas_validas = serie_fecha.dropna()
+    st.dataframe(
+        df_filtrado,
+        use_container_width=True,
+        height=700
+    )
 
-                    if not fechas_validas.empty:
-                        fecha_min = fechas_validas.min().date()
-                        fecha_max = fechas_validas.max().date()
+    csv = df_filtrado.to_csv(index=False).encode("utf-8-sig")
 
-                        rango_fechas = st.date_input(
-                            "Rango de fechas",
-                            value=(fecha_min, fecha_max),
-                            min_value=fecha_min,
-                            max_value=fecha_max,
-                            key=f"fecha_{columna}"
-                        )
+    st.download_button(
+        label="Descargar datos filtrados en CSV",
+        data=csv,
+        file_name="datos_filtrados_L2.csv",
+        mime="text/csv"
+    )
 
-                        if isinstance(rango_fechas, tuple) and len(rango_fechas) == 2:
-                            inicio, fin = rango_fechas
+except FileNotFoundError:
+    st.error("No se encontró el archivo. Revisa que la ruta sea correcta.")
+    st.write(f"Ruta usada: `{ruta_excel}`")
 
-                            fechas_columna = pd.to_datetime(
-                                df_filtrado[columna],
-                                errors="coerce"
-                            )
+except ImportError:
+    st.error("Falta instalar openpyxl.")
+    st.code("pip install openpyxl")
 
-                            df_filtrado = df_filtrado[
-                                (fechas_columna.dt.date >= inicio)
-                                & (fechas_columna.dt.date <= fin)
-                            ]
-                    else:
-                        st.caption("Columna de fecha sin valores válidos.")
-
-                else:
-                    es_columna_maquina = columna.strip().lower() == "maquina"
-
-                    opciones_filtro = [
-                        "Contiene",
-                        "Contiene palabra exacta",
-                        "Igual a",
-                        "Empieza con",
-                        "Termina con"
-                    ]
-
-                    tipo_default = (
-                        opciones_filtro.index("Contiene palabra exacta")
-                        if es_columna_maquina
-                        else opciones_filtro.index("Contiene")
-                    )
-
-                    tipo_filtro_texto = st.selectbox(
-                        "Tipo de filtro",
-                        options=opciones_filtro,
-                        index=tipo_default,
-                        key=f"tipo_texto_{columna}"
-                    )
-
-                    texto_default = "L2" if es_columna_maquina else ""
-
-                    texto = st.text_input(
-                        "Texto a filtrar",
-                        value=texto_default,
-                        key=f"texto_{columna}"
-                    )
-
-                    if texto:
-                        serie_texto = df_filtrado[columna].astype(str).str.strip()
-                        texto_limpio = texto.strip()
-
-                        if tipo_filtro_texto == "Contiene":
-                            patron = re.escape(texto_limpio)
-
-                            df_filtrado = df_filtrado[
-                                serie_texto.str.contains(
-                                    patron,
-                                    case=False,
-                                    na=False,
-                                    regex=True
-                                )
-                            ]
-
-                        elif tipo_filtro_texto == "Contiene palabra exacta":
-                            patron = (
-                                rf"(?<![A-Za-z0-9])"
-                                rf"{re.escape(texto_limpio)}"
-                                rf"(?![A-Za-z0-9])"
-                            )
-
-                            df_filtrado = df_filtrado[
-                                serie_texto.str.contains(
-                                    patron,
-                                    case=False,
-                                    na=False,
-                                    regex=True
-                                )
-                            ]
-
-                        elif tipo_filtro_texto == "Igual a":
-                            df_filtrado = df_filtrado[
-                                serie_texto.str.lower() == texto_limpio.lower()
-                            ]
-
-                        elif tipo_filtro_texto == "Empieza con":
-                            df_filtrado = df_filtrado[
-                                serie_texto.str.lower().str.startswith(
-                                    texto_limpio.lower()
-                                )
-                            ]
-
-                        elif tipo_filtro_texto == "Termina con":
-                            df_filtrado = df_filtrado[
-                                serie_texto.str.lower().str.endswith(
-                                    texto_limpio.lower()
-                                )
-                            ]
-
-                    valores = (
-                        df[columna]
-                        .dropna()
-                        .astype(str)
-                        .sort_values()
-                        .unique()
-                        .tolist()
-                    )
-
-                    if len(valores) <= 500:
-                        seleccion = st.multiselect(
-                            "Valores",
-                            options=valores,
-                            default=valores,
-                            key=f"valores_{columna}"
-                        )
-
-                        df_filtrado = df_filtrado[
-                            df_filtrado[columna].astype(str).isin(seleccion)
-                        ]
-                    else:
-                        st.caption(
-                            "Esta columna tiene más de 500 valores únicos. "
-                            "Usa el filtro de texto."
-                        )
-
-        st.subheader("Datos filtrados")
-        st.write(f"Filas filtradas: **{df_filtrado.shape[0]}**")
-
-        if columnas_visibles:
-            st.dataframe(
-                df_filtrado[columnas_visibles],
-                use_container_width=True,
-                height=650
-            )
-
-            csv = df_filtrado[columnas_visibles].to_csv(
-                index=False
-            ).encode("utf-8-sig")
-
-            st.download_button(
-                label="Descargar resultado filtrado en CSV",
-                data=csv,
-                file_name="datos_filtrados.csv",
-                mime="text/csv"
-            )
-        else:
-            st.warning("Selecciona al menos una columna para mostrar.")
-
-    except ImportError:
-        st.error(
-            "Falta instalar openpyxl. "
-            "Agrega openpyxl en requirements.txt."
-        )
-
-    except Exception as e:
-        st.error("No se pudo leer el archivo Excel.")
-        st.exception(e)
-
-else:
-    st.info("Sube un archivo Excel para empezar.")
+except Exception as e:
+    st.error("No se pudo cargar el archivo Excel.")
+    st.exception(e)
