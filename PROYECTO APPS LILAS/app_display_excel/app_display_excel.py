@@ -10,7 +10,6 @@ st.set_page_config(page_title="Visor Excel L2", layout="wide")
 
 st.title("Visor, análisis, fotos e IDs agrupados")
 
-
 archivo = st.file_uploader(
     "Sube tu archivo Excel",
     type=["xlsx", "xls"]
@@ -232,6 +231,33 @@ def crear_zip_fotos_por_maquina(fotos_configuradas):
 
     zip_buffer.seek(0)
     return zip_buffer.getvalue()
+
+
+def tabla_valores_originales(df_base, columna):
+    if columna == "Id Estándar":
+        tabla = df_base[["Id Estándar", "Maquina"]].copy()
+        tabla = tabla.rename(columns={"Id Estándar": "Valor original"})
+    elif columna == "Maquina":
+        tabla = df_base[["Id Estándar", "Maquina"]].copy()
+        tabla = tabla.rename(columns={"Maquina": "Valor original"})
+    else:
+        tabla = df_base[["Id Estándar", "Maquina", columna]].copy()
+        tabla = tabla.rename(columns={columna: "Valor original"})
+
+    tabla = tabla.loc[:, ~tabla.columns.duplicated()]
+    return tabla
+
+
+def tabla_valores_originales_simple(df_base, columna):
+    if columna == "Id Estándar":
+        tabla = df_base[["Id Estándar"]].copy()
+        tabla = tabla.rename(columns={"Id Estándar": "Valor original"})
+    else:
+        tabla = df_base[["Id Estándar", columna]].copy()
+        tabla = tabla.rename(columns={columna: "Valor original"})
+
+    tabla = tabla.loc[:, ~tabla.columns.duplicated()]
+    return tabla
 
 
 if archivo is not None:
@@ -1014,21 +1040,11 @@ if archivo is not None:
 
                     st.subheader("Comparación por columna")
 
-                    st.write(
-                        "Revisa los valores originales de cada ID. "
-                        "Luego completa el valor final agrupado en la sección inferior."
-                    )
-
                     for columna in df_ids_seleccionados.columns:
                         with st.expander(f"Columna: {columna}", expanded=False):
-                            tabla_columna = df_ids_seleccionados[
-                                ["Id Estándar", "Maquina", columna]
-                            ].copy()
-
-                            tabla_columna = tabla_columna.rename(
-                                columns={
-                                    columna: "Valor original"
-                                }
+                            tabla_columna = tabla_valores_originales(
+                                df_ids_seleccionados,
+                                columna
                             )
 
                             st.dataframe(
@@ -1078,14 +1094,9 @@ if archivo is not None:
                         st.markdown(f"### {columna}")
 
                         with st.expander(f"Ver valores originales de {columna}", expanded=False):
-                            tabla_columna = df_ids_seleccionados[
-                                ["Id Estándar", columna]
-                            ].copy()
-
-                            tabla_columna = tabla_columna.rename(
-                                columns={
-                                    columna: "Valor original"
-                                }
+                            tabla_columna = tabla_valores_originales_simple(
+                                df_ids_seleccionados,
+                                columna
                             )
 
                             st.dataframe(
