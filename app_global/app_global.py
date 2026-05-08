@@ -1,6 +1,7 @@
 """
 Portal Global CCU
 App principal para navegar entre dashboards de Línea 2 y Línea 11.
+Incluye pestaña de alertas por falta de registros recientes.
 
 Ubicación:
 PROYECTO-1-CCU-/
@@ -10,7 +11,9 @@ PROYECTO-1-CCU-/
 
 import base64
 from pathlib import Path
+from datetime import datetime, date
 
+import pandas as pd
 import streamlit as st
 
 
@@ -27,6 +30,38 @@ APP_L2_TULIPAS = PROJECT_DIR / "DASHBOARD L2 TULIPAS" / "app13.py"
 APP_L2_VALVULAS = PROJECT_DIR / "DASHBOARD L2 VALVULAS" / "app13.py"
 APP_L11_TULIPAS = PROJECT_DIR / "DASHBOARD L11 TULIPAS" / "app9.py"
 APP_L11_VALVULAS = PROJECT_DIR / "DASHBOARD L11 VALVULAS" / "app14.py"
+
+
+# =====================================================
+# GOOGLE SHEETS DE CADA DASHBOARD
+# =====================================================
+
+DASHBOARDS_MONITOREADOS = {
+    "Línea 2 · Tulipas": {
+        "sheet_id": "1EjrHHNJXjjBOObeAfIBxQjDfcyCS-o_j4FLaDxOPjRI",
+        "tipo": "Tulipas",
+        "linea": "Línea 2",
+        "umbral_default": 7,
+    },
+    "Línea 2 · Válvulas": {
+        "sheet_id": "12SH_kgBr436fu6gsuqISgXANebVtV_XL2AUH9WASfoI",
+        "tipo": "Válvulas",
+        "linea": "Línea 2",
+        "umbral_default": 7,
+    },
+    "Línea 11 · Tulipas": {
+        "sheet_id": "1PmDo4EjBxXZx0fPMGPMJKzBztyAq8AipxqCsJTFI0e0",
+        "tipo": "Tulipas",
+        "linea": "Línea 11",
+        "umbral_default": 7,
+    },
+    "Línea 11 · Válvulas": {
+        "sheet_id": "1ompaiCPCIegzgj80wHjPde5GL14660AUBnUTt6iTD_w",
+        "tipo": "Válvulas",
+        "linea": "Línea 11",
+        "umbral_default": 7,
+    },
+}
 
 
 # =====================================================
@@ -104,6 +139,165 @@ def mostrar_logo_centrado():
         )
     else:
         st.warning(f"Logo no encontrado: {LOGO_PATH}")
+
+
+# =====================================================
+# UTILIDADES DE ALERTAS
+# =====================================================
+
+def urls_google_sheet(sheet_id):
+    return [
+        f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0",
+        f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid=0",
+        f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv",
+    ]
+
+
+@st.cache_data(ttl=1)
+def cargar_sheet_alerta(sheet_id):
+    ultimo_error = None
+
+    for url in urls_google_sheet(sheet_id):
+        try:
+            df = pd.read_csv(url)
+            df.columns = [str(c).strip() for c in df.columns]
+            return df, None
+        except Exception as e:
+            ultimo_error = e
+
+    return pd.DataFrame(), ultimo_error
+
+
+def detectar_columna_fecha(df):
+    posibles = [
+        "Fecha registro",
+        "Fecha Registro",
+        "FECHA REGISTRO",
+        "Fecha",
+        "FECHA",
+        "fecha",
+    ]
+
+    for col in posibles:
+        if col in df.columns:
+            return col
+
+    return None
+
+
+def calcular_estado_dashboard(nombre, config, umbral_dias):
+    df, error = cargar_sheet_alerta(config["sheet_id"])
+
+    if error is not None and df.empty:
+        return {
+            "Dashboard": nombre,
+            "Línea": config["linea"],
+            "Tipo": config["tipo"],
+            "Estado": "ERROR",
+            "Último registro": "No disponible",
+            "Días sin registro": None,
+            "Umbral": umbral_dias,
+            "Registros": 0,
+            "Detalle": f"No se pudo leer Google Sheets: {error}",
+        }
+
+    if df.empty:
+        return {
+            "Dashboard": nombre,
+            "Línea": config["linea"],
+            "Tipo": config["tipo"],
+            "Estado": "ALERTA",
+            "Último registro": "Sin registros",
+            "Días sin registro": None,
+            "Umbral": umbral_dias,
+            "Registros": 0,
+            "Detalle": "La hoja está vacía o no contiene registros válidos.",
+        }
+
+    columna_fecha = detectar_columna_fecha(df)
+
+    if columna_fecha is None:
+        return {
+            "Dashboard": nombre,
+            "Línea": config["linea"],
+            "Tipo": config["tipo"],
+            "Estado": "ERROR",
+            "Último registro": "No disponible",
+            "Días sin registro": None,
+            "Umbral": umbral_dias,
+            "Registros": len(df),
+            "Detalle": "No se encontró columna Fecha o Fecha registro.",
+        }
+
+    fechas = pd.to_datetime(
+        df[columna_fecha],
+        dayfirst=True,
+        errors="coerce"
+    ).dropna()
+
+    if fechas.empty:
+        return {
+            "Dashboard": nombre,
+            "Línea": config["linea"],
+            "Tipo": config["tipo"],
+            "Estado": "ALERTA",
+            "Último registro": "Sin fechas válidas",
+            "Días sin registro": None,
+            "Umbral": umbral_dias,
+            "Registros": len(df),
+            "Detalle": f"La columna {columna_fecha} no contiene fechas válidas.",
+        }
+
+    ultima_fecha = fechas.max()
+    hoy = pd.Timestamp(date.today())
+    dias_sin_registro = int((hoy.normalize() - ultima_fecha.normalize()).days)
+
+    if dias_sin_registro < 0:
+        estado = "OK"
+        detalle = "Último registro tiene fecha futura o igual a hoy."
+    elif dias_sin_registro > umbral_dias:
+        estado = "ALERTA"
+        detalle = f"Han pasado {dias_sin_registro} días desde el último registro."
+    else:
+        estado = "OK"
+        detalle = f"Último registro dentro del umbral de {umbral_dias} días."
+
+    return {
+        "Dashboard": nombre,
+        "Línea": config["linea"],
+        "Tipo": config["tipo"],
+        "Estado": estado,
+        "Último registro": ultima_fecha.strftime("%d-%m-%Y %H:%M"),
+        "Días sin registro": dias_sin_registro,
+        "Umbral": umbral_dias,
+        "Registros": len(df),
+        "Detalle": detalle,
+    }
+
+
+def tarjeta_estado_alerta(row):
+    estado = row["Estado"]
+
+    if estado == "OK":
+        with st.container(border=True):
+            st.success(f"OK · {row['Dashboard']}")
+            st.markdown(f"**Último registro:** {row['Último registro']}")
+            st.markdown(f"**Días sin registro:** {row['Días sin registro']}")
+            st.caption(row["Detalle"])
+
+    elif estado == "ALERTA":
+        with st.container(border=True):
+            st.error(f"ALERTA · {row['Dashboard']}")
+            st.markdown(f"**Último registro:** {row['Último registro']}")
+            st.markdown(f"**Días sin registro:** {row['Días sin registro']}")
+            st.markdown(f"**Umbral configurado:** {row['Umbral']} días")
+            st.caption(row["Detalle"])
+
+    else:
+        with st.container(border=True):
+            st.warning(f"ERROR · {row['Dashboard']}")
+            st.markdown(f"**Último registro:** {row['Último registro']}")
+            st.caption(row["Detalle"])
 
 
 # =====================================================
@@ -187,6 +381,125 @@ def pagina_inicio():
 
 
 # =====================================================
+# PÁGINA DE ALERTAS
+# =====================================================
+
+def pagina_alertas():
+    mostrar_logo_centrado()
+
+    st.markdown(
+        """
+        <div style='text-align:center; margin-bottom:1.2rem;'>
+            <h1 style='margin-top:0;'>
+                Alertas de registros pendientes
+            </h1>
+            <p style='font-size:17px; opacity:0.75; margin-top:0.4rem;'>
+                Monitoreo de dashboards sin registros recientes.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("---")
+
+    st.sidebar.markdown("## Configuración de alertas")
+
+    umbral_global = st.sidebar.number_input(
+        "Umbral global de días sin registro",
+        min_value=1,
+        max_value=90,
+        value=7,
+        step=1
+    )
+
+    usar_umbral_personalizado = st.sidebar.checkbox(
+        "Usar umbral por dashboard",
+        value=False
+    )
+
+    umbrales = {}
+
+    if usar_umbral_personalizado:
+        for nombre, config in DASHBOARDS_MONITOREADOS.items():
+            umbrales[nombre] = st.sidebar.number_input(
+                f"{nombre}",
+                min_value=1,
+                max_value=90,
+                value=int(config.get("umbral_default", umbral_global)),
+                step=1
+            )
+    else:
+        for nombre in DASHBOARDS_MONITOREADOS:
+            umbrales[nombre] = umbral_global
+
+    if st.sidebar.button("Actualizar alertas"):
+        st.cache_data.clear()
+        st.rerun()
+
+    resultados = []
+
+    for nombre, config in DASHBOARDS_MONITOREADOS.items():
+        estado = calcular_estado_dashboard(
+            nombre=nombre,
+            config=config,
+            umbral_dias=umbrales[nombre]
+        )
+        resultados.append(estado)
+
+    df_alertas = pd.DataFrame(resultados)
+
+    total_alertas = int((df_alertas["Estado"] == "ALERTA").sum())
+    total_ok = int((df_alertas["Estado"] == "OK").sum())
+    total_error = int((df_alertas["Estado"] == "ERROR").sum())
+
+    k1, k2, k3, k4 = st.columns(4)
+
+    with k1:
+        st.metric("Dashboards monitoreados", len(df_alertas))
+
+    with k2:
+        st.metric("OK", total_ok)
+
+    with k3:
+        st.metric("Alertas", total_alertas)
+
+    with k4:
+        st.metric("Errores", total_error)
+
+    st.markdown("---")
+
+    if total_alertas > 0:
+        st.error(f"Hay {total_alertas} dashboard(s) sin registros recientes.")
+    elif total_error > 0:
+        st.warning(f"No hay alertas por antigüedad, pero hay {total_error} error(es) de lectura.")
+    else:
+        st.success("Todos los dashboards tienen registros dentro del umbral configurado.")
+
+    st.markdown("## Estado por dashboard")
+
+    for row in resultados:
+        tarjeta_estado_alerta(row)
+
+    st.markdown("---")
+
+    st.markdown("## Resumen")
+
+    st.dataframe(
+        df_alertas,
+        use_container_width=True,
+        height=280
+    )
+
+    st.download_button(
+        "Descargar resumen de alertas",
+        df_alertas.to_csv(index=False).encode("utf-8-sig"),
+        file_name=f"alertas_dashboards_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
+
+
+# =====================================================
 # VALIDACIÓN DE ARCHIVOS
 # =====================================================
 
@@ -233,7 +546,13 @@ pagina = st.navigation(
                 title="Inicio",
                 icon="🏠",
                 url_path="inicio"
-            )
+            ),
+            st.Page(
+                pagina_alertas,
+                title="Alertas",
+                icon="🚨",
+                url_path="alertas"
+            ),
         ],
         "Línea 2": [
             st.Page(
