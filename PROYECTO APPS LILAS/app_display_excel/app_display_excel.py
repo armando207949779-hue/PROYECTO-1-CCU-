@@ -26,6 +26,8 @@ BASE_DIR = Path(__file__).resolve().parent
 LOGO_CANDIDATES = [
     BASE_DIR / "assets" / "CCU_logo_(2018).svg.png",
     BASE_DIR.parent / "assets" / "CCU_logo_(2018).svg.png",
+    BASE_DIR.parent.parent / "assets" / "CCU_logo_(2018).svg.png",
+    BASE_DIR.parent.parent.parent / "assets" / "CCU_logo_(2018).svg.png",
 ]
 
 LOGO_PATH = next(
@@ -90,7 +92,9 @@ if LOGO_PATH.exists():
         unsafe_allow_html=True
     )
 else:
-    st.warning(f"Logo no encontrado: {LOGO_PATH}")
+    st.warning("Logo no encontrado. Rutas revisadas:")
+    for path in LOGO_CANDIDATES:
+        st.write(str(path))
 
 st.markdown(
     """
@@ -108,7 +112,6 @@ archivo = st.file_uploader(
     "Sube tu archivo Excel",
     type=["xlsx", "xls"]
 )
-
 
 # =====================================================
 # FUNCIONES
