@@ -1,5 +1,6 @@
 # App Streamlit: Registro mantenimiento válvulas KRONES Línea 11
-# Versión con logo, formato mejorado, margen corregido y operadores actualizados
+# Versión con logo, formato mejorado, margen corregido, operadores actualizados
+# y resumen homologado a Línea 2 Válvulas
 
 import streamlit as st
 import gspread
@@ -371,29 +372,21 @@ with st.container(border=True):
 # RESUMEN
 # =====================================================
 with st.container(border=True):
-    st.subheader("Resumen del registro")
+    st.subheader("Resumen")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
 
     with col1:
-        st.metric("Turno", turno if turno else "-")
+        st.write("Fecha:", fecha)
+        st.write("Turno:", turno)
+        st.write("Operador:", operador_final)
 
     with col2:
-        st.metric("Operador", operador_final if operador_final else "-")
-
-    with col3:
-        st.metric("Válvulas", len(valvulas))
-
-    with col4:
-        st.metric("Repuesto", repuesto_final if repuesto_final else "-")
-
-    if valvulas:
-        st.write("Válvulas seleccionadas:")
-        st.write(valvulas)
+        st.write("Repuesto / Mantención:", repuesto_final)
+        st.write("Válvulas seleccionadas:", valvulas)
 
     if observaciones:
-        st.write("Observaciones:")
-        st.write(observaciones)
+        st.write("Observaciones:", observaciones)
 
     guardar = st.button("Guardar registro", use_container_width=True)
 
@@ -460,7 +453,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Válvulas KRONES Línea 11</b> · v1.2<br>
+        <b>Formulario Mantenimiento Válvulas KRONES Línea 11</b> · v1.3<br>
         Streamlit · Google Sheets
     </div>
     """,
