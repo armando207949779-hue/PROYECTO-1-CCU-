@@ -1,7 +1,7 @@
 """
 Portal Global CCU
 App principal para navegar entre dashboards de Línea 2 y Línea 11.
-Incluye pestaña de alertas por falta de registros recientes.
+Incluye pestaña de alertas por falta de registros recientes y descarga PDF.
 
 Ubicación:
 PROYECTO-1-CCU-/
@@ -12,6 +12,7 @@ PROYECTO-1-CCU-/
 import base64
 from pathlib import Path
 from datetime import datetime, date
+from io import BytesIO
 
 import pandas as pd
 import streamlit as st
@@ -185,6 +186,26 @@ def detectar_columna_fecha(df):
     return None
 
 
+def detectar_columna_operador(df):
+    posibles = [
+        "Operador",
+        "OPERADOR",
+        "operador",
+        "Usuario",
+        "USUARIO",
+        "usuario",
+        "Responsable",
+        "RESPONSABLE",
+        "responsable",
+    ]
+
+    for col in posibles:
+        if col in df.columns:
+            return col
+
+    return None
+
+
 def calcular_estado_dashboard(nombre, config, umbral_dias):
     df, error = cargar_sheet_alerta(config["sheet_id"])
 
@@ -195,6 +216,7 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
             "Tipo": config["tipo"],
             "Estado": "ERROR",
             "Último registro": "No disponible",
+            "Último operador": "No disponible",
             "Días sin registro": None,
             "Umbral": umbral_dias,
             "Registros": 0,
@@ -208,6 +230,7 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
             "Tipo": config["tipo"],
             "Estado": "ALERTA",
             "Último registro": "Sin registros",
+            "Último operador": "Sin registros",
             "Días sin registro": None,
             "Umbral": umbral_dias,
             "Registros": 0,
@@ -215,6 +238,7 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
         }
 
     columna_fecha = detectar_columna_fecha(df)
+    columna_operador = detectar_columna_operador(df)
 
     if columna_fecha is None:
         return {
@@ -223,32 +247,48 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
             "Tipo": config["tipo"],
             "Estado": "ERROR",
             "Último registro": "No disponible",
+            "Último operador": "No disponible",
             "Días sin registro": None,
             "Umbral": umbral_dias,
             "Registros": len(df),
             "Detalle": "No se encontró columna Fecha o Fecha registro.",
         }
 
-    fechas = pd.to_datetime(
-        df[columna_fecha],
+    df_tmp = df.copy()
+
+    df_tmp["_fecha_alerta"] = pd.to_datetime(
+        df_tmp[columna_fecha],
         dayfirst=True,
         errors="coerce"
-    ).dropna()
+    )
 
-    if fechas.empty:
+    df_tmp = df_tmp.dropna(subset=["_fecha_alerta"])
+
+    if df_tmp.empty:
         return {
             "Dashboard": nombre,
             "Línea": config["linea"],
             "Tipo": config["tipo"],
             "Estado": "ALERTA",
             "Último registro": "Sin fechas válidas",
+            "Último operador": "No disponible",
             "Días sin registro": None,
             "Umbral": umbral_dias,
             "Registros": len(df),
             "Detalle": f"La columna {columna_fecha} no contiene fechas válidas.",
         }
 
-    ultima_fecha = fechas.max()
+    ultimo = df_tmp.sort_values("_fecha_alerta").iloc[-1]
+    ultima_fecha = ultimo["_fecha_alerta"]
+
+    if columna_operador is not None:
+        ultimo_operador = str(ultimo[columna_operador]).strip().upper()
+
+        if ultimo_operador in ["", "NAN", "NONE", "NAT"]:
+            ultimo_operador = "SIN OPERADOR"
+    else:
+        ultimo_operador = "No disponible"
+
     hoy = pd.Timestamp(date.today())
     dias_sin_registro = int((hoy.normalize() - ultima_fecha.normalize()).days)
 
@@ -268,6 +308,7 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
         "Tipo": config["tipo"],
         "Estado": estado,
         "Último registro": ultima_fecha.strftime("%d-%m-%Y %H:%M"),
+        "Último operador": ultimo_operador,
         "Días sin registro": dias_sin_registro,
         "Umbral": umbral_dias,
         "Registros": len(df),
@@ -291,6 +332,7 @@ def tarjeta_estado_alerta(row):
     linea = row["Línea"]
     tipo = row["Tipo"]
     ultimo = row["Último registro"]
+    ultimo_operador = row.get("Último operador", "No disponible")
     dias = row["Días sin registro"]
     umbral = row["Umbral"]
     registros = row["Registros"]
@@ -315,7 +357,7 @@ def tarjeta_estado_alerta(row):
             dias_txt = "N/A"
 
     with st.container(border=True):
-        c1, c2, c3, c4, c5 = st.columns([0.55, 2.2, 1.1, 1.2, 1.4])
+        c1, c2, c3, c4, c5 = st.columns([0.45, 2.0, 1.0, 1.0, 2.0])
 
         with c1:
             st.markdown(f"### {icono}")
@@ -341,10 +383,213 @@ def tarjeta_estado_alerta(row):
         with c5:
             st.caption("Último registro")
             st.markdown(f"**{ultimo}**")
+            st.markdown(f"**Operador:** {ultimo_operador}")
             st.caption(f"Umbral: {umbral} días · Registros: {registros}")
 
         if estado != "OK":
             st.caption(detalle)
+
+
+# =====================================================
+# PDF ALERTAS
+# =====================================================
+
+def generar_pdf_alertas(df_alertas, umbral_global):
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Paragraph,
+            Spacer,
+            Table,
+            TableStyle,
+        )
+    except ImportError:
+        return None
+
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=1.1 * cm,
+        leftMargin=1.1 * cm,
+        topMargin=1.0 * cm,
+        bottomMargin=1.0 * cm,
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "TitleCenter",
+        parent=styles["Title"],
+        alignment=TA_CENTER,
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor("#0E4C92"),
+        spaceAfter=10,
+    )
+
+    subtitle_style = ParagraphStyle(
+        "SubtitleCenter",
+        parent=styles["Normal"],
+        alignment=TA_CENTER,
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor("#4b5563"),
+        spaceAfter=12,
+    )
+
+    normal_style = styles["Normal"]
+    normal_style.fontSize = 8
+    normal_style.leading = 10
+
+    story = []
+
+    fecha_reporte = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+
+    story.append(Paragraph("Reporte de Alertas - Dashboards CCU", title_style))
+    story.append(
+        Paragraph(
+            f"Generado: {fecha_reporte} | Umbral global: {umbral_global} dias sin registro",
+            subtitle_style
+        )
+    )
+
+    total_dashboards = len(df_alertas)
+    total_ok = int((df_alertas["Estado"] == "OK").sum())
+    total_alertas = int((df_alertas["Estado"] == "ALERTA").sum())
+    total_error = int((df_alertas["Estado"] == "ERROR").sum())
+
+    resumen_data = [
+        ["Dashboards", "Al día", "Alertas", "Errores"],
+        [str(total_dashboards), str(total_ok), str(total_alertas), str(total_error)],
+    ]
+
+    resumen_table = Table(
+        resumen_data,
+        colWidths=[5 * cm, 5 * cm, 5 * cm, 5 * cm]
+    )
+
+    resumen_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0E4C92")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d1d5db")),
+    ]))
+
+    story.append(resumen_table)
+    story.append(Spacer(1, 0.35 * cm))
+
+    columnas = [
+        "Linea",
+        "Dashboard",
+        "Estado",
+        "Ultimo registro",
+        "Ultimo operador",
+        "Dias",
+        "Umbral",
+        "Registros",
+    ]
+
+    data = [columnas]
+
+    df_pdf = df_alertas.copy()
+
+    df_pdf["Días sin registro"] = pd.to_numeric(
+        df_pdf["Días sin registro"],
+        errors="coerce"
+    )
+
+    df_pdf = df_pdf.sort_values(
+        by=["Línea", "Días sin registro"],
+        ascending=[True, False],
+        na_position="last"
+    )
+
+    for _, row in df_pdf.iterrows():
+        dias = row.get("Días sin registro", None)
+
+        if pd.isna(dias):
+            dias_txt = "N/A"
+        else:
+            dias_txt = str(int(dias))
+
+        data.append([
+            str(row.get("Línea", "")),
+            str(row.get("Dashboard", "")),
+            str(row.get("Estado", "")),
+            str(row.get("Último registro", "")),
+            str(row.get("Último operador", "No disponible")),
+            dias_txt,
+            str(row.get("Umbral", "")),
+            str(row.get("Registros", "")),
+        ])
+
+    table = Table(
+        data,
+        colWidths=[
+            2.3 * cm,
+            4.1 * cm,
+            2.0 * cm,
+            3.1 * cm,
+            4.5 * cm,
+            1.6 * cm,
+            1.7 * cm,
+            1.9 * cm,
+        ],
+        repeatRows=1
+    )
+
+    table_style = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2937")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#d1d5db")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]
+
+    for i in range(1, len(data)):
+        estado = data[i][2]
+
+        if estado == "ALERTA":
+            table_style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#fee2e2")))
+        elif estado == "ERROR":
+            table_style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#fef3c7")))
+        else:
+            table_style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#dcfce7")))
+
+    table.setStyle(TableStyle(table_style))
+
+    story.append(table)
+    story.append(Spacer(1, 0.25 * cm))
+
+    story.append(
+        Paragraph(
+            "Criterio: se genera alerta cuando los dias sin registro son mayores al umbral configurado.",
+            normal_style
+        )
+    )
+
+    doc.build(story)
+
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    return pdf_bytes
 
 
 # =====================================================
@@ -549,10 +794,6 @@ def pagina_alertas():
 
     st.markdown("---")
 
-    # =====================================================
-    # BLOQUE LÍNEA 2
-    # =====================================================
-
     df_linea_2 = df_alertas[df_alertas["Línea"] == "Línea 2"].copy()
 
     st.markdown("## Línea 2")
@@ -579,10 +820,6 @@ def pagina_alertas():
             tarjeta_estado_alerta(row)
 
     st.markdown("---")
-
-    # =====================================================
-    # BLOQUE LÍNEA 11
-    # =====================================================
 
     df_linea_11 = df_alertas[df_alertas["Línea"] == "Línea 11"].copy()
 
@@ -611,7 +848,7 @@ def pagina_alertas():
 
     st.markdown("---")
 
-    with st.expander("Ver tabla completa de alertas", expanded=False):
+    with st.expander("Ver tabla completa y descargas", expanded=False):
         df_alertas_mostrar = df_alertas.copy()
 
         df_alertas_mostrar["Días sin registro"] = df_alertas_mostrar[
@@ -625,11 +862,25 @@ def pagina_alertas():
         )
 
         st.download_button(
-            "Descargar resumen de alertas",
+            "Descargar resumen de alertas CSV",
             df_alertas.to_csv(index=False).encode("utf-8-sig"),
             file_name=f"alertas_dashboards_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
         )
+
+        pdf_bytes = generar_pdf_alertas(df_alertas, umbral_global)
+
+        if pdf_bytes is None:
+            st.warning(
+                "Para descargar PDF, agrega `reportlab` en requirements.txt."
+            )
+        else:
+            st.download_button(
+                "Descargar reporte de alertas PDF",
+                pdf_bytes,
+                file_name=f"reporte_alertas_dashboards_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf"
+            )
 
 
 # =====================================================
