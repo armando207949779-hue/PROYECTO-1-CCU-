@@ -298,52 +298,47 @@ def tarjeta_estado_alerta(row):
 
     if estado == "OK":
         icono = "✅"
-        titulo_estado = "Al día"
-        color_estado = "success"
+        estado_txt = "Al día"
     elif estado == "ALERTA":
         icono = "🚨"
-        titulo_estado = "Revisar"
-        color_estado = "error"
+        estado_txt = "Revisar"
     else:
         icono = "⚠️"
-        titulo_estado = "Error de lectura"
-        color_estado = "warning"
+        estado_txt = "Error"
+
+    dias_txt = "N/A" if dias is None else str(int(dias))
 
     with st.container(border=True):
-        col1, col2, col3 = st.columns([1.0, 2.5, 1.3])
+        c1, c2, c3, c4, c5 = st.columns([0.55, 2.2, 1.1, 1.2, 1.4])
 
-        with col1:
-            st.markdown(f"## {icono}")
+        with c1:
+            st.markdown(f"### {icono}")
 
-            if color_estado == "success":
-                st.success(titulo_estado)
-            elif color_estado == "error":
-                st.error(titulo_estado)
-            else:
-                st.warning(titulo_estado)
-
-        with col2:
-            st.markdown(f"### {dashboard}")
+        with c2:
+            st.markdown(f"**{dashboard}**")
             st.caption(f"{linea} · {tipo}")
-            st.markdown(f"**Último registro:** {ultimo}")
-            st.markdown(f"**Registros cargados:** {registros}")
 
-        with col3:
-            if dias is None:
-                st.markdown("### N/A")
-                st.caption("Días sin registro")
+        with c3:
+            st.caption("Estado")
+
+            if estado == "OK":
+                st.success(estado_txt)
+            elif estado == "ALERTA":
+                st.error(estado_txt)
             else:
-                st.markdown(f"### {dias}")
-                st.caption("Días sin registro")
+                st.warning(estado_txt)
 
-            st.caption(f"Umbral: {umbral} días")
+        with c4:
+            st.caption("Días sin registro")
+            st.markdown(f"### {dias_txt}")
 
-        if estado == "ALERTA":
-            st.error(detalle)
-        elif estado == "ERROR":
-            st.warning(detalle)
-        else:
-            st.success(detalle)
+        with c5:
+            st.caption("Último registro")
+            st.markdown(f"**{ultimo}**")
+            st.caption(f"Umbral: {umbral} días · Registros: {registros}")
+
+        if estado != "OK":
+            st.caption(detalle)
 
 
 # =====================================================
@@ -440,7 +435,7 @@ def pagina_alertas():
                 Alertas de registros pendientes
             </h1>
             <p style='font-size:17px; opacity:0.75; margin-top:0.4rem;'>
-                Estado de actualización de cada dashboard.
+                Dashboards ordenados por mayor cantidad de días sin registro.
             </p>
         </div>
         """,
@@ -495,6 +490,24 @@ def pagina_alertas():
 
     df_alertas = pd.DataFrame(resultados)
 
+    if df_alertas.empty:
+        st.warning("No hay dashboards configurados para monitorear.")
+        return
+
+    # Orden mayor a menor por días sin registro.
+    # Los N/A quedan abajo.
+    df_alertas["Orden días"] = df_alertas["Días sin registro"].fillna(-1)
+
+    df_alertas = (
+        df_alertas
+        .sort_values(
+            by=["Orden días", "Estado"],
+            ascending=[False, True]
+        )
+        .drop(columns=["Orden días"])
+        .reset_index(drop=True)
+    )
+
     total_dashboards = len(df_alertas)
     total_ok = int((df_alertas["Estado"] == "OK").sum())
     total_alertas = int((df_alertas["Estado"] == "ALERTA").sum())
@@ -514,8 +527,6 @@ def pagina_alertas():
     with k4:
         tarjeta_resumen("Errores", total_error, "⚠️")
 
-    st.markdown("---")
-
     if total_alertas > 0:
         st.error(
             f"{total_alertas} dashboard(s) superan el umbral de {umbral_global} días sin registros."
@@ -529,44 +540,32 @@ def pagina_alertas():
             f"Todos los dashboards tienen registros dentro del umbral de {umbral_global} días."
         )
 
-    st.markdown("## Estado por dashboard")
+    st.markdown("## Panel compacto")
 
-    orden_estado = {
-        "ALERTA": 0,
-        "ERROR": 1,
-        "OK": 2
-    }
-
-    resultados_ordenados = sorted(
-        resultados,
-        key=lambda x: orden_estado.get(x["Estado"], 99)
-    )
-
-    for row in resultados_ordenados:
+    for _, row in df_alertas.iterrows():
         tarjeta_estado_alerta(row)
 
     st.markdown("---")
 
-    st.markdown("## Resumen general")
+    with st.expander("Ver tabla completa de alertas", expanded=False):
+        df_alertas_mostrar = df_alertas.copy()
 
-    df_alertas_mostrar = df_alertas.copy()
+        df_alertas_mostrar["Días sin registro"] = df_alertas_mostrar[
+            "Días sin registro"
+        ].fillna("N/A")
 
-    df_alertas_mostrar["Días sin registro"] = df_alertas_mostrar[
-        "Días sin registro"
-    ].fillna("N/A")
+        st.dataframe(
+            df_alertas_mostrar,
+            use_container_width=True,
+            height=260
+        )
 
-    st.dataframe(
-        df_alertas_mostrar,
-        use_container_width=True,
-        height=280
-    )
-
-    st.download_button(
-        "Descargar resumen de alertas",
-        df_alertas.to_csv(index=False).encode("utf-8-sig"),
-        file_name=f"alertas_dashboards_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv"
-    )
+        st.download_button(
+            "Descargar resumen de alertas",
+            df_alertas.to_csv(index=False).encode("utf-8-sig"),
+            file_name=f"alertas_dashboards_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
 
 
 # =====================================================
