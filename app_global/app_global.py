@@ -306,7 +306,6 @@ def tarjeta_estado_alerta(row):
         icono = "⚠️"
         estado_txt = "Error"
 
-    # Manejo seguro de None, NaN o valores no numéricos
     if pd.isna(dias):
         dias_txt = "N/A"
     else:
@@ -442,7 +441,7 @@ def pagina_alertas():
                 Alertas de registros pendientes
             </h1>
             <p style='font-size:17px; opacity:0.75; margin-top:0.4rem;'>
-                Dashboards ordenados por mayor cantidad de días sin registro.
+                Dashboards separados por línea y ordenados por mayor cantidad de días sin registro.
             </p>
         </div>
         """,
@@ -501,8 +500,6 @@ def pagina_alertas():
         st.warning("No hay dashboards configurados para monitorear.")
         return
 
-    # Orden mayor a menor por días sin registro.
-    # Los N/A quedan abajo.
     df_alertas["Orden días"] = pd.to_numeric(
         df_alertas["Días sin registro"],
         errors="coerce"
@@ -550,10 +547,67 @@ def pagina_alertas():
             f"Todos los dashboards tienen registros dentro del umbral de {umbral_global} días."
         )
 
-    st.markdown("## Panel compacto")
+    st.markdown("---")
 
-    for _, row in df_alertas.iterrows():
-        tarjeta_estado_alerta(row)
+    # =====================================================
+    # BLOQUE LÍNEA 2
+    # =====================================================
+
+    df_linea_2 = df_alertas[df_alertas["Línea"] == "Línea 2"].copy()
+
+    st.markdown("## Línea 2")
+
+    if df_linea_2.empty:
+        st.info("No hay dashboards configurados para Línea 2.")
+    else:
+        l2_ok = int((df_linea_2["Estado"] == "OK").sum())
+        l2_alertas = int((df_linea_2["Estado"] == "ALERTA").sum())
+        l2_error = int((df_linea_2["Estado"] == "ERROR").sum())
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            tarjeta_resumen("Al día Línea 2", l2_ok, "✅")
+
+        with c2:
+            tarjeta_resumen("Alertas Línea 2", l2_alertas, "🚨")
+
+        with c3:
+            tarjeta_resumen("Errores Línea 2", l2_error, "⚠️")
+
+        for _, row in df_linea_2.iterrows():
+            tarjeta_estado_alerta(row)
+
+    st.markdown("---")
+
+    # =====================================================
+    # BLOQUE LÍNEA 11
+    # =====================================================
+
+    df_linea_11 = df_alertas[df_alertas["Línea"] == "Línea 11"].copy()
+
+    st.markdown("## Línea 11")
+
+    if df_linea_11.empty:
+        st.info("No hay dashboards configurados para Línea 11.")
+    else:
+        l11_ok = int((df_linea_11["Estado"] == "OK").sum())
+        l11_alertas = int((df_linea_11["Estado"] == "ALERTA").sum())
+        l11_error = int((df_linea_11["Estado"] == "ERROR").sum())
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            tarjeta_resumen("Al día Línea 11", l11_ok, "✅")
+
+        with c2:
+            tarjeta_resumen("Alertas Línea 11", l11_alertas, "🚨")
+
+        with c3:
+            tarjeta_resumen("Errores Línea 11", l11_error, "⚠️")
+
+        for _, row in df_linea_11.iterrows():
+            tarjeta_estado_alerta(row)
 
     st.markdown("---")
 
