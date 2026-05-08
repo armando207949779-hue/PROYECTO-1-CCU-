@@ -69,12 +69,12 @@ def filtro_checkboxes_vertical(
     valores,
     key_prefix,
     activar_por_defecto=True,
-    max_valores=300
+    max_valores=300,
+    conteos=None
 ):
     st.markdown(f"**{titulo}**")
 
     valores = [str(v) for v in valores if pd.notna(v)]
-    valores = sorted(list(set(valores)))
 
     texto_buscar = st.text_input(
         "Buscar en listado",
@@ -97,32 +97,25 @@ def filtro_checkboxes_vertical(
         )
         valores_mostrar = valores_mostrar[:max_valores]
 
-    col_a, col_b = st.columns(2)
-
-    with col_a:
-        seleccionar_todos = st.checkbox(
-            "Seleccionar todos",
-            value=activar_por_defecto,
-            key=f"todos_{key_prefix}"
-        )
-
-    with col_b:
-        limpiar_todos = st.checkbox(
-            "Limpiar todos",
-            value=False,
-            key=f"limpiar_{key_prefix}"
-        )
+    seleccionar_todos = st.checkbox(
+        "Seleccionar todos",
+        value=activar_por_defecto,
+        key=f"todos_{key_prefix}"
+    )
 
     seleccionados = []
 
     for valor in valores_mostrar:
         valor_key = re.sub(r"[^A-Za-z0-9_]", "_", valor)
 
-        checked_default = seleccionar_todos and not limpiar_todos
+        if conteos is not None:
+            etiqueta = f"{valor} ({conteos.get(valor, 0)})"
+        else:
+            etiqueta = valor
 
         marcado = st.checkbox(
-            valor,
-            value=checked_default,
+            etiqueta,
+            value=seleccionar_todos,
             key=f"chk_{key_prefix}_{valor_key}"
         )
 
@@ -168,7 +161,7 @@ if archivo is not None:
         with st.sidebar.expander("Columnas a mostrar", expanded=False):
             columnas_visibles = []
 
-            marcar_todas_columnas = st.checkbox(
+            mostrar_todas_columnas = st.checkbox(
                 "Mostrar todas las columnas",
                 value=True,
                 key="mostrar_todas_columnas"
@@ -177,7 +170,7 @@ if archivo is not None:
             for columna in df.columns:
                 mostrar = st.checkbox(
                     columna,
-                    value=marcar_todas_columnas,
+                    value=mostrar_todas_columnas,
                     key=f"mostrar_columna_{columna}"
                 )
 
@@ -233,20 +226,21 @@ if archivo is not None:
 
         if usar_filtro_maquinas:
             with st.sidebar.expander("Listado de máquinas L2", expanded=True):
-                maquinas_l2 = (
+                conteo_maquinas_l2 = (
                     df_filtrado["Maquina"]
                     .dropna()
                     .astype(str)
-                    .sort_values()
-                    .unique()
-                    .tolist()
+                    .value_counts()
                 )
+
+                maquinas_l2 = conteo_maquinas_l2.index.tolist()
 
                 maquinas_seleccionadas = filtro_checkboxes_vertical(
                     titulo="Máquinas disponibles",
                     valores=maquinas_l2,
                     key_prefix="maquinas_l2",
-                    activar_por_defecto=True
+                    activar_por_defecto=True,
+                    conteos=conteo_maquinas_l2
                 )
 
             if maquinas_seleccionadas:
@@ -402,14 +396,14 @@ if archivo is not None:
                             tipo_filtro_texto
                         )
 
-                    valores = (
+                    valores_con_conteo = (
                         df_filtrado[columna]
                         .dropna()
                         .astype(str)
-                        .sort_values()
-                        .unique()
-                        .tolist()
+                        .value_counts()
                     )
+
+                    valores = valores_con_conteo.index.tolist()
 
                     aplicar_listado = st.checkbox(
                         "Aplicar filtro por listado con checkboxes",
@@ -422,7 +416,8 @@ if archivo is not None:
                             titulo=f"Valores de {columna}",
                             valores=valores,
                             key_prefix=f"valores_{columna}",
-                            activar_por_defecto=True
+                            activar_por_defecto=True,
+                            conteos=valores_con_conteo
                         )
 
                         if seleccion:
