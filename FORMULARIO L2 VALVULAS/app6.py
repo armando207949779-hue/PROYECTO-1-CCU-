@@ -1,5 +1,5 @@
 # App Streamlit: Registro mantenimiento válvulas KRONES Línea 2
-# Versión con logo, formato mejorado, margen ajustado y operadores actualizados
+# Versión con logo, formato mejorado, margen corregido y operadores actualizados
 
 import streamlit as st
 import gspread
@@ -115,11 +115,12 @@ st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 0.8rem;
+        padding-top: 2.2rem;
         padding-bottom: 1.2rem;
         padding-left: 2rem;
         padding-right: 2rem;
         max-width: 1180px;
+        margin: 0 auto;
     }
 
     h1 {
@@ -147,6 +148,60 @@ st.markdown(
 
     div[data-testid="stVerticalBlock"] {
         gap: 0.35rem;
+    }
+
+    .logo-wrapper {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding-top: 1.2rem;
+        padding-bottom: 2.8rem;
+        margin-bottom: 0.4rem;
+    }
+
+    .logo-wrapper img {
+        width: 190px;
+        max-width: 70%;
+        display: block;
+    }
+
+    .header-wrapper {
+        text-align: center;
+        padding: 0px 10px 8px 10px;
+        max-width: 900px;
+        margin: 0 auto 1.2rem auto;
+    }
+
+    .header-wrapper h1 {
+        color: #0E4C92;
+        margin-top: 0px;
+        margin-bottom: 26px;
+        font-size: 2.1rem;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+    }
+
+    .header-wrapper h2 {
+        color: #2E86C1;
+        margin-top: 0px;
+        margin-bottom: 26px;
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .header-wrapper p {
+        color: #5D6D7E;
+        font-size: 1rem;
+        margin-top: 0px;
+        margin-bottom: 22px;
+    }
+
+    .header-wrapper hr {
+        border: 1px solid #D6EAF8;
+        width: 75%;
+        margin-top: 10px;
+        margin-bottom: 0px;
     }
 
     .valvula-resumen {
@@ -178,21 +233,9 @@ def mostrar_logo():
 
         st.markdown(
             f"""
-            <div style="
-                width: 100%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                margin-top: 1.4rem;
-                margin-bottom: 2.2rem;
-            ">
+            <div class="logo-wrapper">
                 <img
                     src="data:image/png;base64,{logo_base64}"
-                    style="
-                        width: 190px;
-                        max-width: 70%;
-                        display: block;
-                    "
                     alt="Logo CCU"
                 >
             </div>
@@ -210,17 +253,17 @@ mostrar_logo()
 
 st.markdown(
     """
-    <div style='text-align: center; padding: 10px 10px 4px 10px;'>
-        <h1 style='color:#0E4C92; margin-bottom:18px; font-size: 2.1rem;'>
+    <div class='header-wrapper'>
+        <h1>
             REGISTRO DE MANTENIMIENTO
         </h1>
-        <h2 style='color:#2E86C1; margin-top:0px; font-size: 1.25rem; font-weight: 600;'>
+        <h2>
             LÍNEA 2 · VÁLVULAS KRONES
         </h2>
-        <p style='color:#5D6D7E; font-size: 1rem; margin-top: 18px;'>
+        <p>
             Formulario para registrar mantenciones operacionales de válvulas
         </p>
-        <hr style='border: 1px solid #D6EAF8; width:75%; margin-top: 18px;'>
+        <hr>
     </div>
     """,
     unsafe_allow_html=True
@@ -407,7 +450,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Válvulas KRONES Línea 2</b> · v1.2<br>
+        <b>Formulario Mantenimiento Válvulas KRONES Línea 2</b> · v1.3<br>
         Streamlit · Google Sheets
     </div>
     """,
