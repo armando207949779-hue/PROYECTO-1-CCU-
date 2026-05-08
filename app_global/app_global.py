@@ -33,7 +33,7 @@ APP_L11_VALVULAS = PROJECT_DIR / "DASHBOARD L11 VALVULAS" / "app14.py"
 
 
 # =====================================================
-# GOOGLE SHEETS DE CADA DASHBOARD
+# GOOGLE SHEETS MONITOREADOS
 # =====================================================
 
 DASHBOARDS_MONITOREADOS = {
@@ -41,25 +41,25 @@ DASHBOARDS_MONITOREADOS = {
         "sheet_id": "1EjrHHNJXjjBOObeAfIBxQjDfcyCS-o_j4FLaDxOPjRI",
         "tipo": "Tulipas",
         "linea": "Línea 2",
-        "umbral_default": 7,
+        "umbral_default": 3,
     },
     "Línea 2 · Válvulas": {
         "sheet_id": "12SH_kgBr436fu6gsuqISgXANebVtV_XL2AUH9WASfoI",
         "tipo": "Válvulas",
         "linea": "Línea 2",
-        "umbral_default": 7,
+        "umbral_default": 3,
     },
     "Línea 11 · Tulipas": {
         "sheet_id": "1PmDo4EjBxXZx0fPMGPMJKzBztyAq8AipxqCsJTFI0e0",
         "tipo": "Tulipas",
         "linea": "Línea 11",
-        "umbral_default": 7,
+        "umbral_default": 3,
     },
     "Línea 11 · Válvulas": {
         "sheet_id": "1ompaiCPCIegzgj80wHjPde5GL14660AUBnUTt6iTD_w",
         "tipo": "Válvulas",
         "linea": "Línea 11",
-        "umbral_default": 7,
+        "umbral_default": 3,
     },
 }
 
@@ -142,7 +142,7 @@ def mostrar_logo_centrado():
 
 
 # =====================================================
-# UTILIDADES DE ALERTAS
+# UTILIDADES ALERTAS
 # =====================================================
 
 def urls_google_sheet(sheet_id):
@@ -275,33 +275,79 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
     }
 
 
+def tarjeta_resumen(titulo, valor, icono=None):
+    with st.container(border=True):
+        st.caption(titulo)
+
+        if icono:
+            st.markdown(f"### {icono} {valor}")
+        else:
+            st.markdown(f"### {valor}")
+
+
 def tarjeta_estado_alerta(row):
     estado = row["Estado"]
+    dashboard = row["Dashboard"]
+    linea = row["Línea"]
+    tipo = row["Tipo"]
+    ultimo = row["Último registro"]
+    dias = row["Días sin registro"]
+    umbral = row["Umbral"]
+    registros = row["Registros"]
+    detalle = row["Detalle"]
 
     if estado == "OK":
-        with st.container(border=True):
-            st.success(f"OK · {row['Dashboard']}")
-            st.markdown(f"**Último registro:** {row['Último registro']}")
-            st.markdown(f"**Días sin registro:** {row['Días sin registro']}")
-            st.caption(row["Detalle"])
-
+        icono = "✅"
+        titulo_estado = "Al día"
+        color_estado = "success"
     elif estado == "ALERTA":
-        with st.container(border=True):
-            st.error(f"ALERTA · {row['Dashboard']}")
-            st.markdown(f"**Último registro:** {row['Último registro']}")
-            st.markdown(f"**Días sin registro:** {row['Días sin registro']}")
-            st.markdown(f"**Umbral configurado:** {row['Umbral']} días")
-            st.caption(row["Detalle"])
-
+        icono = "🚨"
+        titulo_estado = "Revisar"
+        color_estado = "error"
     else:
-        with st.container(border=True):
-            st.warning(f"ERROR · {row['Dashboard']}")
-            st.markdown(f"**Último registro:** {row['Último registro']}")
-            st.caption(row["Detalle"])
+        icono = "⚠️"
+        titulo_estado = "Error de lectura"
+        color_estado = "warning"
+
+    with st.container(border=True):
+        col1, col2, col3 = st.columns([1.0, 2.5, 1.3])
+
+        with col1:
+            st.markdown(f"## {icono}")
+
+            if color_estado == "success":
+                st.success(titulo_estado)
+            elif color_estado == "error":
+                st.error(titulo_estado)
+            else:
+                st.warning(titulo_estado)
+
+        with col2:
+            st.markdown(f"### {dashboard}")
+            st.caption(f"{linea} · {tipo}")
+            st.markdown(f"**Último registro:** {ultimo}")
+            st.markdown(f"**Registros cargados:** {registros}")
+
+        with col3:
+            if dias is None:
+                st.markdown("### N/A")
+                st.caption("Días sin registro")
+            else:
+                st.markdown(f"### {dias}")
+                st.caption("Días sin registro")
+
+            st.caption(f"Umbral: {umbral} días")
+
+        if estado == "ALERTA":
+            st.error(detalle)
+        elif estado == "ERROR":
+            st.warning(detalle)
+        else:
+            st.success(detalle)
 
 
 # =====================================================
-# PÁGINA DE INICIO
+# PÁGINA INICIO
 # =====================================================
 
 def pagina_inicio():
@@ -381,7 +427,7 @@ def pagina_inicio():
 
 
 # =====================================================
-# PÁGINA DE ALERTAS
+# PÁGINA ALERTAS
 # =====================================================
 
 def pagina_alertas():
@@ -394,7 +440,7 @@ def pagina_alertas():
                 Alertas de registros pendientes
             </h1>
             <p style='font-size:17px; opacity:0.75; margin-top:0.4rem;'>
-                Monitoreo de dashboards sin registros recientes.
+                Estado de actualización de cada dashboard.
             </p>
         </div>
         """,
@@ -406,15 +452,15 @@ def pagina_alertas():
     st.sidebar.markdown("## Configuración de alertas")
 
     umbral_global = st.sidebar.number_input(
-        "Umbral global de días sin registro",
+        "Días máximos sin registro",
         min_value=1,
         max_value=90,
-        value=7,
+        value=3,
         step=1
     )
 
     usar_umbral_personalizado = st.sidebar.checkbox(
-        "Usar umbral por dashboard",
+        "Configurar por dashboard",
         value=False
     )
 
@@ -423,10 +469,10 @@ def pagina_alertas():
     if usar_umbral_personalizado:
         for nombre, config in DASHBOARDS_MONITOREADOS.items():
             umbrales[nombre] = st.sidebar.number_input(
-                f"{nombre}",
+                nombre,
                 min_value=1,
                 max_value=90,
-                value=int(config.get("umbral_default", umbral_global)),
+                value=int(config.get("umbral_default", 3)),
                 step=1
             )
     else:
@@ -449,44 +495,68 @@ def pagina_alertas():
 
     df_alertas = pd.DataFrame(resultados)
 
-    total_alertas = int((df_alertas["Estado"] == "ALERTA").sum())
+    total_dashboards = len(df_alertas)
     total_ok = int((df_alertas["Estado"] == "OK").sum())
+    total_alertas = int((df_alertas["Estado"] == "ALERTA").sum())
     total_error = int((df_alertas["Estado"] == "ERROR").sum())
 
     k1, k2, k3, k4 = st.columns(4)
 
     with k1:
-        st.metric("Dashboards monitoreados", len(df_alertas))
+        tarjeta_resumen("Dashboards", total_dashboards)
 
     with k2:
-        st.metric("OK", total_ok)
+        tarjeta_resumen("Al día", total_ok, "✅")
 
     with k3:
-        st.metric("Alertas", total_alertas)
+        tarjeta_resumen("Alertas", total_alertas, "🚨")
 
     with k4:
-        st.metric("Errores", total_error)
+        tarjeta_resumen("Errores", total_error, "⚠️")
 
     st.markdown("---")
 
     if total_alertas > 0:
-        st.error(f"Hay {total_alertas} dashboard(s) sin registros recientes.")
+        st.error(
+            f"{total_alertas} dashboard(s) superan el umbral de {umbral_global} días sin registros."
+        )
     elif total_error > 0:
-        st.warning(f"No hay alertas por antigüedad, pero hay {total_error} error(es) de lectura.")
+        st.warning(
+            f"No hay alertas por antigüedad, pero hay {total_error} dashboard(s) con error de lectura."
+        )
     else:
-        st.success("Todos los dashboards tienen registros dentro del umbral configurado.")
+        st.success(
+            f"Todos los dashboards tienen registros dentro del umbral de {umbral_global} días."
+        )
 
     st.markdown("## Estado por dashboard")
 
-    for row in resultados:
+    orden_estado = {
+        "ALERTA": 0,
+        "ERROR": 1,
+        "OK": 2
+    }
+
+    resultados_ordenados = sorted(
+        resultados,
+        key=lambda x: orden_estado.get(x["Estado"], 99)
+    )
+
+    for row in resultados_ordenados:
         tarjeta_estado_alerta(row)
 
     st.markdown("---")
 
-    st.markdown("## Resumen")
+    st.markdown("## Resumen general")
+
+    df_alertas_mostrar = df_alertas.copy()
+
+    df_alertas_mostrar["Días sin registro"] = df_alertas_mostrar[
+        "Días sin registro"
+    ].fillna("N/A")
 
     st.dataframe(
-        df_alertas,
+        df_alertas_mostrar,
         use_container_width=True,
         height=280
     )
