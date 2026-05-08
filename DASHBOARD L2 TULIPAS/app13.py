@@ -47,7 +47,7 @@ GRID = "rgba(128,128,128,0.15)"
 LINE = "rgba(128,128,128,0.30)"
 
 # =====================================================
-# ESTILO
+# ESTILO GENERAL
 # =====================================================
 st.markdown(
     """
@@ -252,71 +252,19 @@ def obtener_operador_menos_registros(df_filtrado, operadores_disponibles):
 
 
 def tarjeta_kpi(titulo, valor, detalle=None, alerta=False):
-    color_detalle = "#4ade80"
-    borde = "rgba(128,128,128,0.22)"
-    fondo = "rgba(255,255,255,0.02)"
+    with st.container(border=True):
+        st.caption(titulo)
 
-    if alerta:
-        color_detalle = "#facc15"
-        borde = "rgba(250,204,21,0.55)"
-        fondo = "rgba(250,204,21,0.06)"
+        if alerta:
+            st.markdown(f"### ⚠️ {valor}")
+        else:
+            st.markdown(f"### {valor}")
 
-    detalle_html = ""
-
-    if detalle:
-        detalle_html = f"""
-        <div style="
-            margin-top: 0.55rem;
-            color: {color_detalle};
-            font-size: 0.92rem;
-            line-height: 1.25;
-            white-space: normal;
-            overflow-wrap: anywhere;
-        ">
-            {detalle}
-        </div>
-        """
-
-    st.markdown(
-        f"""
-        <div style="
-            border: 1px solid {borde};
-            background: {fondo};
-            border-radius: 0.6rem;
-            padding: 0.85rem 0.95rem;
-            min-height: 125px;
-            width: 100%;
-            overflow: visible;
-            margin-bottom: 1rem;
-            box-sizing: border-box;
-        ">
-            <div style="
-                font-size: 0.90rem;
-                font-weight: 700;
-                margin-bottom: 0.50rem;
-                line-height: 1.25;
-                white-space: normal;
-                overflow-wrap: anywhere;
-            ">
-                {titulo}
-            </div>
-
-            <div style="
-                font-size: clamp(1.35rem, 2vw, 2rem);
-                font-weight: 650;
-                line-height: 1.15;
-                white-space: normal;
-                overflow-wrap: anywhere;
-                word-break: normal;
-            ">
-                {valor}
-            </div>
-
-            {detalle_html}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+        if detalle:
+            if alerta:
+                st.warning(detalle)
+            else:
+                st.success(detalle)
 
 
 # =====================================================
@@ -949,34 +897,19 @@ promedio_registros_dia = len(df_f) / max(df_f["Fecha"].nunique(), 1)
 kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
 
 with kpi1:
-    tarjeta_kpi(
-        "Total registros",
-        total_registros
-    )
+    tarjeta_kpi("Total registros", total_registros)
 
 with kpi2:
-    tarjeta_kpi(
-        "Días con registros",
-        dias_con_registros
-    )
+    tarjeta_kpi("Días con registros", dias_con_registros)
 
 with kpi3:
-    tarjeta_kpi(
-        "Operadores",
-        operadores_unicos
-    )
+    tarjeta_kpi("Operadores", operadores_unicos)
 
 with kpi4:
-    tarjeta_kpi(
-        "Tulipas intervenidas",
-        tulipas_intervenidas
-    )
+    tarjeta_kpi("Tulipas intervenidas", tulipas_intervenidas)
 
 with kpi5:
-    tarjeta_kpi(
-        "Registros por día",
-        f"{promedio_registros_dia:.1f}"
-    )
+    tarjeta_kpi("Registros por día", f"{promedio_registros_dia:.1f}")
 
 kpi6, kpi7 = st.columns(2)
 
