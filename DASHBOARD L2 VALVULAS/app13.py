@@ -41,14 +41,6 @@ CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
 VALVULAS_TODAS = list(range(1, 113))
 
-TIPOS_MANTENCION = [
-    "BLOQUE",
-    "O-RINGS",
-    "RESORTE",
-    "ON/OFF",
-    "OTRO"
-]
-
 COLORS_REPUESTO = {
     "BLOQUE": "#3498db",
     "O-RINGS": "#e74c3c",
@@ -187,6 +179,7 @@ def obtener_valvula_mas_critica(df):
         return "Sin datos", 0
 
     top = conteo.iloc[0]
+
     return f"Válvula {int(top['Válvula'])}", int(top["Intervenciones"])
 
 
@@ -289,6 +282,44 @@ def cargar_datos():
 # =====================================================
 # GRÁFICOS
 # =====================================================
+def grafico_estado_valvulas(df):
+    conteos = (
+        df["Válvula"]
+        .value_counts()
+        .reindex(VALVULAS_TODAS, fill_value=0)
+        .sort_index()
+    )
+
+    colores = [
+        "#27ae60" if c == 0 else "#f39c12" if c <= 2 else "#e74c3c"
+        for c in conteos.values
+    ]
+
+    fig = go.Figure(data=[go.Bar(
+        x=conteos.index,
+        y=conteos.values,
+        marker=dict(color=colores),
+        text=conteos.values,
+        textposition="outside",
+        cliponaxis=False,
+        hovertemplate="<b>Válvula %{x}</b><br>Mantenciones: %{y}<extra></extra>"
+    )])
+
+    aplicar_estilo_figura(fig, "Estado global de las 112 válvulas", 430, t=85, b=90)
+
+    fig.update_layout(
+        xaxis_title="Número de válvula",
+        yaxis_title="Cantidad de mantenciones",
+        showlegend=False,
+        margin=dict(l=70, r=80, t=85, b=95)
+    )
+
+    max_y = conteos.max() if not conteos.empty else 1
+    fig.update_yaxes(range=[0, max_y * 1.25 if max_y > 0 else 1])
+
+    return fig
+
+
 def grafico_tendencia_temporal(df):
     df_tmp = df.copy()
     df_tmp["Fecha_dia"] = df_tmp["Fecha"].dt.date
@@ -326,6 +357,7 @@ def grafico_tendencia_temporal(df):
     ))
 
     aplicar_estilo_figura(fig, "Tendencia temporal de registros", 380)
+
     fig.update_layout(
         xaxis_title="Fecha",
         yaxis_title="Registros",
@@ -387,6 +419,7 @@ def grafico_por_turno(df):
     )])
 
     aplicar_estilo_figura(fig, "Registros por turno", 360, t=85, b=75)
+
     fig.update_layout(
         xaxis_title="Turno",
         yaxis_title="Cantidad",
@@ -423,6 +456,7 @@ def grafico_por_operador(df):
     )])
 
     aplicar_estilo_figura(fig, "Top operadores", 420, t=85, b=150)
+
     fig.update_layout(
         xaxis_title="Operador",
         yaxis_title="Cantidad",
@@ -459,6 +493,7 @@ def grafico_por_mantencion(df):
     )])
 
     aplicar_estilo_figura(fig, "Tipos de mantención", 430, t=85, b=160)
+
     fig.update_layout(
         xaxis_title="Tipo de mantención",
         yaxis_title="Cantidad",
@@ -470,108 +505,6 @@ def grafico_por_mantencion(df):
 
     max_y = mt["Cantidad"].max() if not mt.empty else 1
     fig.update_yaxes(range=[0, max_y * 1.25])
-
-    return fig
-
-
-def grafico_turno_operador(df):
-    pivot = df.pivot_table(
-        index="Turno",
-        columns="Operador",
-        aggfunc="size",
-        fill_value=0
-    )
-
-    fig = go.Figure(data=go.Heatmap(
-        z=pivot.values,
-        x=pivot.columns,
-        y=pivot.index,
-        colorscale="Blues",
-        hovertemplate="<b>Turno %{y}</b><br><b>%{x}</b><br>Registros: %{z}<extra></extra>"
-    ))
-
-    aplicar_estilo_figura(fig, "Heatmap: turno × operador", 390)
-    fig.update_layout(
-        xaxis_title="Operador",
-        yaxis_title="Turno",
-        margin=dict(l=70, r=80, t=85, b=120)
-    )
-
-    fig.update_xaxes(tickangle=-35)
-
-    return fig
-
-
-def grafico_heatmap_valvula_mantencion(df):
-    pivot = df.pivot_table(
-        index="Válvula",
-        columns="Mantención",
-        aggfunc="size",
-        fill_value=0
-    )
-
-    for tipo in TIPOS_MANTENCION:
-        if tipo not in pivot.columns:
-            pivot[tipo] = 0
-
-    for valvula in VALVULAS_TODAS:
-        if valvula not in pivot.index:
-            pivot.loc[valvula] = 0
-
-    pivot = pivot.sort_index()[TIPOS_MANTENCION]
-
-    fig = go.Figure(data=go.Heatmap(
-        z=pivot.values,
-        x=pivot.columns,
-        y=pivot.index,
-        colorscale="YlOrRd",
-        colorbar=dict(title="Cantidad"),
-        hovertemplate="<b>Válvula %{y}</b><br><b>%{x}</b><br>Registros: %{z}<extra></extra>"
-    ))
-
-    aplicar_estilo_figura(fig, "Válvulas 1-112 × tipo de mantención", 800, l=80)
-    fig.update_layout(
-        xaxis_title="Tipo de mantención",
-        yaxis_title="Número de válvula",
-        margin=dict(l=80, r=90, t=85, b=75)
-    )
-
-    return fig
-
-
-def grafico_estado_valvulas(df):
-    conteos = (
-        df["Válvula"]
-        .value_counts()
-        .reindex(VALVULAS_TODAS, fill_value=0)
-        .sort_index()
-    )
-
-    colores = [
-        "#27ae60" if c == 0 else "#f39c12" if c <= 2 else "#e74c3c"
-        for c in conteos.values
-    ]
-
-    fig = go.Figure(data=[go.Bar(
-        x=conteos.index,
-        y=conteos.values,
-        marker=dict(color=colores),
-        text=conteos.values,
-        textposition="outside",
-        cliponaxis=False,
-        hovertemplate="<b>Válvula %{x}</b><br>Mantenciones: %{y}<extra></extra>"
-    )])
-
-    aplicar_estilo_figura(fig, "Estado global de las 112 válvulas", 430, t=85, b=90)
-    fig.update_layout(
-        xaxis_title="Número de válvula",
-        yaxis_title="Cantidad de mantenciones",
-        showlegend=False,
-        margin=dict(l=70, r=80, t=85, b=95)
-    )
-
-    max_y = conteos.max() if not conteos.empty else 1
-    fig.update_yaxes(range=[0, max_y * 1.25 if max_y > 0 else 1])
 
     return fig
 
@@ -607,6 +540,7 @@ def grafico_valvula_mantencion_burbujas(df):
         ))
 
     aplicar_estilo_figura(fig, "Distribución válvula × tipo de mantención", 390)
+
     fig.update_layout(
         xaxis_title="Número de válvula",
         yaxis_title="Tipo de mantención",
@@ -614,37 +548,6 @@ def grafico_valvula_mantencion_burbujas(df):
     )
 
     return fig
-
-
-def crear_tabla_resumen_valvulas(df):
-    resumen = []
-
-    for valvula in VALVULAS_TODAS:
-        df_valvula = df[df["Válvula"] == valvula]
-
-        if df_valvula.empty:
-            resumen.append({
-                "Válvula": valvula,
-                "Total": 0,
-                "Tipos": "SIN REGISTRO",
-                "Último registro": "-",
-                "Último operador": "-"
-            })
-
-        else:
-            df_valvula = df_valvula.sort_values("Fecha")
-            tipos = ", ".join(sorted(df_valvula["Mantención"].dropna().unique()))
-            ultimo = df_valvula.iloc[-1]
-
-            resumen.append({
-                "Válvula": valvula,
-                "Total": len(df_valvula),
-                "Tipos": tipos,
-                "Último registro": ultimo["Fecha"].strftime("%d-%m-%Y"),
-                "Último operador": ultimo["Operador"]
-            })
-
-    return pd.DataFrame(resumen)
 
 
 # =====================================================
@@ -781,24 +684,9 @@ mostrar_mantencion = st.sidebar.checkbox(
     value=True
 )
 
-mostrar_turno_operador = st.sidebar.checkbox(
-    "Turno × operador",
-    value=False
-)
-
-mostrar_heatmap_valvula = st.sidebar.checkbox(
-    "Válvula × tipo de mantención",
-    value=True
-)
-
 mostrar_burbujas = st.sidebar.checkbox(
     "Distribución válvula × mantención",
     value=True
-)
-
-mostrar_tabla_resumen = st.sidebar.checkbox(
-    "Tabla resumen por válvula",
-    value=False
 )
 
 mostrar_datos_detallados = st.sidebar.checkbox(
@@ -874,7 +762,7 @@ with kpi7:
 kpi8, kpi9 = st.columns(2)
 
 with kpi8:
-    valvulas_sin_registro = 112 - df_f["Válvula"].nunique()
+    valvulas_sin_registro = len(set(valvulas_sel)) - df_f["Válvula"].nunique()
 
     tarjeta_kpi(
         "Válvulas sin registro",
@@ -958,54 +846,12 @@ else:
 
         st.markdown("---")
 
-    if mostrar_turno_operador:
-        st.markdown("## Análisis turno × operador")
-
-        st.plotly_chart(
-            grafico_turno_operador(df_f),
-            use_container_width=True
-        )
-
-        st.markdown("---")
-
-    if mostrar_heatmap_valvula:
-        st.markdown("## Análisis por válvula y tipo de mantención")
-
-        st.plotly_chart(
-            grafico_heatmap_valvula_mantencion(df_f),
-            use_container_width=True
-        )
-
-        st.markdown("---")
-
     if mostrar_burbujas:
         st.markdown("## Distribución válvula × tipo de mantención")
 
         st.plotly_chart(
             grafico_valvula_mantencion_burbujas(df_f),
             use_container_width=True
-        )
-
-        st.markdown("---")
-
-    if mostrar_tabla_resumen:
-        st.markdown("## Tabla resumen por válvula")
-
-        df_resumen = crear_tabla_resumen_valvulas(df_f)
-
-        st.dataframe(
-            df_resumen,
-            use_container_width=True,
-            height=420
-        )
-
-        st.markdown("### Descarga resumen")
-
-        st.download_button(
-            "Descargar resumen de válvulas",
-            df_resumen.to_csv(index=False).encode("utf-8-sig"),
-            file_name=f"resumen_valvulas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
         )
 
         st.markdown("---")
