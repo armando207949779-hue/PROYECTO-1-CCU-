@@ -54,7 +54,7 @@ st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 1.2rem;
+        padding-top: 0.5rem;
         padding-bottom: 1rem;
     }
 
@@ -638,12 +638,16 @@ if LOGO_PATH.exists():
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-top: 0.3rem;
-            margin-bottom: 1.0rem;
+            margin-top: 2.4rem;
+            margin-bottom: 1.3rem;
         ">
             <img
                 src="data:image/png;base64,{logo_base64}"
-                style="width: 260px; max-width: 85%; display: block;"
+                style="
+                    width: 210px;
+                    max-width: 70%;
+                    display: block;
+                "
                 alt="Logo CCU"
             >
         </div>
@@ -655,9 +659,9 @@ else:
 
 st.markdown(
     """
-    <div style='text-align:center; margin-bottom:1.2rem;'>
-        <h1>Dashboard Mantenimiento Tulipas · Línea 2</h1>
-        <p style='color:#5D6D7E;'>
+    <div style='text-align:center; margin-bottom:1.6rem;'>
+        <h1 style='margin-top:0;'>Dashboard Mantenimiento Tulipas · Línea 2</h1>
+        <p style='color:#5D6D7E; margin-top:0.4rem;'>
             Embotelladora CCU · Monitoreo de mantenimiento por cabezal y tulipa
         </p>
     </div>
