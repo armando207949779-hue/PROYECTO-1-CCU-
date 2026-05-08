@@ -1,22 +1,43 @@
-# App Streamlit: Registro mantenimiento válvulas KRONES Línea 2 (SIN LOGO)
+# App Streamlit: Registro mantenimiento válvulas KRONES Línea 2 - CON LOGO Y FORMATO ACTUALIZADO
 
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
+from pathlib import Path
+import base64
 
 # =====================================================
 # CONFIGURACIÓN GENERAL
 # =====================================================
 st.set_page_config(
     page_title="Registro Mantenimiento Válvulas L2",
+    page_icon="🏢",
     layout="wide"
 )
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/12SH_kgBr436fu6gsuqISgXANebVtV_XL2AUH9WASfoI/edit?usp=sharing"
 ZONA_HORARIA = ZoneInfo("America/Santiago")
 
+# =====================================================
+# RUTAS DEL PROYECTO / LOGO
+# =====================================================
+BASE_DIR = Path(__file__).resolve().parent
+
+LOGO_CANDIDATES = [
+    BASE_DIR / "assets" / "CCU_logo_(2018).svg.png",
+    BASE_DIR.parent / "assets" / "CCU_logo_(2018).svg.png",
+]
+
+LOGO_PATH = next(
+    (path for path in LOGO_CANDIDATES if path.exists()),
+    LOGO_CANDIDATES[0]
+)
+
+# =====================================================
+# LISTAS FORMULARIO
+# =====================================================
 TURNOS = ["", "A", "B", "C"]
 
 OPERADORES = [
@@ -88,15 +109,49 @@ def guardar_registros(filas):
 
 
 # =====================================================
-# ESTILO
+# ESTILO GENERAL
 # =====================================================
 st.markdown(
     """
     <style>
-    .block-container {padding-top: 1rem; padding-bottom: 1rem;}
-    div[data-testid="stCheckbox"] {margin-bottom: -12px;}
-    div[data-testid="stCheckbox"] label {font-size: 0.75rem;}
-    div[data-testid="stVerticalBlock"] {gap: 0.35rem;}
+    .block-container {
+        padding-top: 0.5rem;
+        padding-bottom: 1rem;
+        max-width: 1200px;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 0.2rem;
+        color: #0E4C92;
+        line-height: 1.15;
+    }
+
+    h2 {
+        color: #2E86C1;
+    }
+
+    h3 {
+        color: #0E4C92;
+    }
+
+    div[data-testid="stCheckbox"] {
+        margin-bottom: -12px;
+    }
+
+    div[data-testid="stCheckbox"] label {
+        font-size: 0.75rem;
+    }
+
+    div[data-testid="stVerticalBlock"] {
+        gap: 0.35rem;
+    }
+
+    .form-card-title {
+        color: #0E4C92;
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -104,24 +159,63 @@ st.markdown(
 
 
 # =====================================================
-# ENCABEZADO (SIN LOGO)
+# FUNCIÓN LOGO
 # =====================================================
+def mostrar_logo():
+    if LOGO_PATH.exists():
+        logo_base64 = base64.b64encode(LOGO_PATH.read_bytes()).decode("utf-8")
+
+        st.markdown(
+            f"""
+            <div style="
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                margin-top: 1.2rem;
+                margin-bottom: 0.8rem;
+            ">
+                <img
+                    src="data:image/png;base64,{logo_base64}"
+                    style="
+                        width: 190px;
+                        max-width: 70%;
+                        display: block;
+                    "
+                    alt="Logo CCU"
+                >
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.warning(f"Logo no encontrado: {LOGO_PATH}")
+
+
+# =====================================================
+# ENCABEZADO
+# =====================================================
+mostrar_logo()
+
 st.markdown(
     """
-    <div style='text-align:left; padding-bottom:10px;'>
-        <h1 style='color:#0E4C92; margin-bottom:0px;'>
-            Registro de Mantenimiento de Válvulas KRONES
+    <div style='text-align: center; padding: 4px 10px 4px 10px;'>
+        <h1 style='color:#0E4C92; margin-bottom:4px; font-size: 2.1rem;'>
+            REGISTRO DE MANTENIMIENTO
         </h1>
-        <h3 style='color:#2E86C1; margin-top:4px;'>
-            Línea 2 · Planta Modelo
-        </h3>
-        <p style='color:#5D6D7E;'>
-            Formulario para registrar mantenciones operacionales.
+        <h2 style='color:#2E86C1; margin-top:0px; font-size: 1.25rem; font-weight: 600;'>
+            LÍNEA 2 · VÁLVULAS KRONES
+        </h2>
+        <p style='color:#5D6D7E; font-size: 1rem; margin-top: 8px;'>
+            Formulario para registrar mantenciones operacionales de válvulas
         </p>
+        <hr style='border: 1px solid #D6EAF8; width:75%; margin-top: 10px;'>
     </div>
     """,
     unsafe_allow_html=True
 )
+
+st.info("Complete todos los campos requeridos antes de guardar el registro.")
 
 
 # =====================================================
@@ -142,6 +236,7 @@ with st.container(border=True):
         operador_sel = st.selectbox("Operador", OPERADORES)
 
     operador_manual = ""
+
     if operador_sel == "OTRO":
         operador_manual = st.text_input("Especificar operador").upper().strip()
 
@@ -149,32 +244,44 @@ with st.container(border=True):
 
 
 # =====================================================
-# REPUESTO (SELECCIÓN ÚNICA)
+# REPUESTO / MANTENCIÓN
 # =====================================================
 with st.container(border=True):
     st.subheader("Repuesto / Mantención")
 
-    repuesto_sel = st.selectbox("Seleccione", [""] + REPUESTOS)
+    col1, col2 = st.columns([1, 2])
 
-    otro_repuesto = ""
-    if repuesto_sel == "OTRO":
-        otro_repuesto = st.text_input("Especificar OTRO").upper().strip()
+    with col1:
+        repuesto_sel = st.selectbox("Seleccione", [""] + REPUESTOS)
+
+    with col2:
+        otro_repuesto = ""
+
+        if repuesto_sel == "OTRO":
+            otro_repuesto = st.text_input("Especificar OTRO").upper().strip()
 
     repuesto_final = otro_repuesto if repuesto_sel == "OTRO" else repuesto_sel
 
-    observaciones = st.text_area("Observaciones", height=80)
+    observaciones = st.text_area(
+        "Observaciones",
+        height=100,
+        placeholder="Escriba observaciones adicionales..."
+    )
 
 
 # =====================================================
-# VÁLVULAS
+# SELECCIÓN DE VÁLVULAS
 # =====================================================
 with st.container(border=True):
     st.subheader("Selección de válvulas")
+
+    st.caption("Seleccione una o más válvulas intervenidas.")
 
     columnas = 14
 
     for inicio in range(1, 113, columnas):
         cols = st.columns(columnas)
+
         for i, num in enumerate(range(inicio, min(inicio + columnas, 113))):
             with cols[i]:
                 st.checkbox(str(num), key=f"val_{num}")
@@ -184,7 +291,10 @@ with st.container(border=True):
         if st.session_state.get(f"val_{n}", False)
     ]
 
-    st.info(f"Seleccionadas: {len(valvulas)}")
+    st.info(f"Válvulas seleccionadas: {len(valvulas)}")
+
+    if valvulas:
+        st.write(valvulas)
 
 
 # =====================================================
@@ -193,54 +303,86 @@ with st.container(border=True):
 with st.container(border=True):
     st.subheader("Resumen")
 
-    st.write("Turno:", turno)
-    st.write("Operador:", operador_final)
-    st.write("Válvulas:", valvulas)
-    st.write("Repuesto:", repuesto_final)
+    col1, col2 = st.columns(2)
 
-    guardar = st.button("Guardar", use_container_width=True)
+    with col1:
+        st.write("Fecha:", fecha)
+        st.write("Turno:", turno)
+        st.write("Operador:", operador_final)
+
+    with col2:
+        st.write("Repuesto / Mantención:", repuesto_final)
+        st.write("Válvulas seleccionadas:", valvulas)
+
+    if observaciones:
+        st.write("Observaciones:", observaciones)
+
+    guardar = st.button("Guardar registro", use_container_width=True)
 
 
 # =====================================================
-# GUARDADO
+# VALIDACIÓN Y GUARDADO
 # =====================================================
 if guardar:
 
     errores = []
 
+    if fecha is None:
+        errores.append("Seleccionar fecha")
+
     if not turno:
         errores.append("Seleccionar turno")
+
     if not operador_final:
-        errores.append("Ingresar operador")
-    if not valvulas:
-        errores.append("Seleccionar válvulas")
+        errores.append("Seleccionar operador")
+
     if not repuesto_sel:
-        errores.append("Seleccionar repuesto")
+        errores.append("Seleccionar repuesto / mantención")
+
     if repuesto_sel == "OTRO" and not otro_repuesto:
-        errores.append("Especificar OTRO")
+        errores.append("Especificar repuesto / mantención")
+
+    if not valvulas:
+        errores.append("Seleccionar al menos una válvula")
 
     if errores:
-        for e in errores:
-            st.error(e)
+        for error in errores:
+            st.error(error)
 
     else:
         filas = []
-        fecha_reg = obtener_fecha_registro()
+        fecha_registro = obtener_fecha_registro()
 
-        for v in valvulas:
+        for valvula in valvulas:
             filas.append([
                 fecha.strftime("%d-%m-%Y"),
                 turno,
                 operador_final,
-                v,
+                valvula,
                 repuesto_final,
                 observaciones,
-                fecha_reg,
-                "Streamlit"
+                fecha_registro,
+                "Formulario Válvulas KRONES L2"
             ])
 
         try:
             guardar_registros(filas)
-            st.success(f"{len(filas)} registros guardados correctamente")
+            st.success(f"{len(filas)} registros guardados correctamente.")
+
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error al guardar: {e}")
+
+
+# =====================================================
+# FOOTER
+# =====================================================
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
+        <b>Formulario Mantenimiento Válvulas KRONES Línea 2</b> · v1.1<br>
+        Streamlit · Google Sheets
+    </div>
+    """,
+    unsafe_allow_html=True
+)
