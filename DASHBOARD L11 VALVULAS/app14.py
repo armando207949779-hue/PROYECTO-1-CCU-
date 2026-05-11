@@ -778,44 +778,6 @@ def grafico_valvula_mantencion_burbujas(df):
     return fig
 
 
-def grafico_top_valvulas(df, top_n=15):
-    if df.empty:
-        return fig_sin_datos()
-
-    top = (
-        df["Válvula"]
-        .value_counts()
-        .head(top_n)
-        .reset_index()
-    )
-
-    top.columns = ["Válvula", "Cantidad"]
-    top = top.sort_values("Cantidad", ascending=False)
-
-    fig = go.Figure(data=[go.Bar(
-        x=top["Válvula"].astype(str),
-        y=top["Cantidad"],
-        marker=dict(color=top["Cantidad"], colorscale="YlOrRd", showscale=False),
-        text=top["Cantidad"],
-        textposition="outside",
-        cliponaxis=False,
-        hovertemplate="<b>Válvula %{x}</b><br>Registros: %{y}<extra></extra>"
-    )])
-
-    aplicar_estilo_figura(fig, f"Top {top_n} válvulas más intervenidas", 480, t=90, b=110)
-
-    fig.update_layout(
-        xaxis_title="Válvula",
-        yaxis_title="Cantidad de registros",
-        showlegend=False,
-        margin=dict(l=70, r=90, t=90, b=115)
-    )
-
-    max_y = top["Cantidad"].max() if not top.empty else 1
-    fig.update_yaxes(range=[0, max_y * 1.25])
-
-    return fig
-
 
 # =====================================================
 # CARGA DE DATOS
@@ -976,10 +938,6 @@ mostrar_estado_global = st.sidebar.checkbox(
     value=True
 )
 
-mostrar_top_valvulas = st.sidebar.checkbox(
-    "Top válvulas más intervenidas",
-    value=True
-)
 
 mostrar_tendencia = st.sidebar.checkbox(
     "Tendencia temporal",
@@ -1148,13 +1106,6 @@ else:
 
         st.markdown("---")
 
-    if mostrar_top_valvulas:
-        st.plotly_chart(
-            grafico_top_valvulas(df_f),
-            use_container_width=True
-        )
-
-        st.markdown("---")
 
     if mostrar_tendencia:
         st.markdown("## Tendencia temporal")
