@@ -604,7 +604,7 @@ def editor_descripcion_pasos(columna, serie, key_prefix):
     key_cantidad = f"{key_prefix}_cantidad_pasos"
 
     if key_cantidad not in st.session_state:
-        st.session_state[key_cantidad] = max(len(pasos_sugeridos), 1)
+        st.session_state[key_cantidad] = max(len(pasos_sugeridos), 3)
 
     col_btn_1, col_btn_2 = st.columns(2)
 
@@ -641,7 +641,7 @@ def editor_lista_textbox(columna, serie, key_prefix):
     key_cantidad = f"{key_prefix}_cantidad"
 
     if key_cantidad not in st.session_state:
-        st.session_state[key_cantidad] = 1
+        st.session_state[key_cantidad] = max(len(valores_unicos), 3)
 
     st.write(f"¿Cuántos elementos colocar en **{columna}**?")
 
@@ -681,10 +681,9 @@ def convertir_dataframe_a_mayusculas(df_base):
     df_mayusculas = df_base.copy()
 
     for columna in df_mayusculas.columns:
-        if df_mayusculas[columna].dtype == "object":
-            df_mayusculas[columna] = df_mayusculas[columna].apply(
-                lambda valor: valor.upper() if isinstance(valor, str) else valor
-            )
+        df_mayusculas[columna] = df_mayusculas[columna].apply(
+            lambda valor: valor.upper() if isinstance(valor, str) else valor
+        )
 
     return df_mayusculas
 
@@ -1538,8 +1537,8 @@ if archivo is not None:
                     st.write(
                         "Los campos se completan usando repositorios de opciones para evitar errores. "
                         "Lila, criticidad, punto Q, estado equipo, frecuencia, turno y días de la semana usan dropdown. "
-                        "Descripción actividad permite agregar o quitar pasos. "
-                        "EPP y materiales/herramientas usan cajas de texto, parten con 1 elemento y permiten agregar más. "
+                        "Descripción actividad muestra 3 pasos por defecto y permite agregar o quitar pasos. "
+                        "EPP y materiales/herramientas muestran 3 cajas de texto por defecto y permiten agregar más. "
                         "En tiempo estimado se muestra la suma como ayuda."
                     )
 
@@ -1602,7 +1601,7 @@ if archivo is not None:
 
                         elif tipo_columna == "Descripción Actividad":
                             st.caption(
-                                "Agrega o quita pasos. Cada paso se redacta en una caja independiente."
+                                "Por defecto se muestran 3 pasos. Puedes agregar o quitar pasos."
                             )
 
                             valores_finales[columna] = editor_descripcion_pasos(
@@ -1613,7 +1612,7 @@ if archivo is not None:
 
                         elif tipo_columna == "Epp":
                             st.caption(
-                                "Ingresa los EPP en cajas de texto. Por defecto se muestra 1 elemento y puedes agregar más."
+                                "Por defecto se muestran 3 cajas de texto para EPP. Puedes agregar más."
                             )
 
                             valores_finales[columna] = editor_lista_textbox(
@@ -1624,7 +1623,7 @@ if archivo is not None:
 
                         elif tipo_columna == "Materiales/Herramientas":
                             st.caption(
-                                "Ingresa materiales o herramientas en cajas de texto. Por defecto se muestra 1 elemento y puedes agregar más."
+                                "Por defecto se muestran 3 cajas de texto para materiales o herramientas. Puedes agregar más."
                             )
 
                             valores_finales[columna] = editor_lista_textbox(
