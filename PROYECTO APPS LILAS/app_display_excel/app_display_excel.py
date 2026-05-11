@@ -266,7 +266,6 @@ def filtro_checkboxes_vertical(
         )
         valores_mostrar = valores_mostrar[:max_valores]
 
-    # Inicializa el estado de cada checkbox
     for valor in valores_mostrar:
         valor_key = re.sub(r"[^A-Za-z0-9_]", "_", valor)
         checkbox_key = f"chk_{key_prefix}_{valor_key}"
@@ -409,6 +408,91 @@ def cargar_archivo(archivo_subido):
         return df_cargado, hoja
 
     raise ValueError("Formato no soportado. Usa Excel o Parquet.")
+
+
+def limpiar_serie_texto(serie):
+    serie_limpia = (
+        serie
+        .dropna()
+        .astype(str)
+        .str.strip()
+    )
+
+    serie_limpia = serie_limpia[
+        (serie_limpia != "")
+        & (serie_limpia.str.lower() != "nan")
+        & (serie_limpia.str.lower() != "none")
+        & (serie_limpia.str.lower() != "nat")
+    ]
+
+    return serie_limpia
+
+
+def valor_mas_repetido(serie):
+    serie_limpia = limpiar_serie_texto(serie)
+
+    if serie_limpia.empty:
+        return ""
+
+    return serie_limpia.value_counts().index[0]
+
+
+def valores_unicos_como_lista(serie):
+    serie_limpia = limpiar_serie_texto(serie)
+
+    if serie_limpia.empty:
+        return ""
+
+    valores_unicos = list(dict.fromkeys(serie_limpia.tolist()))
+
+    return "\n".join([f"- {valor}" for valor in valores_unicos])
+
+
+def descripcion_actividad_por_pasos(serie):
+    serie_limpia = limpiar_serie_texto(serie)
+
+    if serie_limpia.empty:
+        return "Paso 1: \nPaso 2: \nPaso 3: "
+
+    valores_unicos = list(dict.fromkeys(serie_limpia.tolist()))
+
+    pasos = []
+
+    for idx, valor in enumerate(valores_unicos, start=1):
+        pasos.append(f"Paso {idx}: {valor}")
+
+    return "\n".join(pasos)
+
+
+def nombre_columna_normalizado(columna):
+    return (
+        str(columna)
+        .strip()
+        .lower()
+        .replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+    )
+
+
+def es_columna_descripcion_actividad(columna):
+    columna_norm = nombre_columna_normalizado(columna)
+    return "descripcion actividad" in columna_norm
+
+
+def es_columna_epp(columna):
+    columna_norm = nombre_columna_normalizado(columna)
+    return columna_norm == "epp" or columna_norm == "e.p.p."
+
+
+def es_columna_materiales_herramientas(columna):
+    columna_norm = nombre_columna_normalizado(columna)
+    return (
+        "materiales" in columna_norm
+        and "herramientas" in columna_norm
+    )
 
 
 # =====================================================
@@ -1114,7 +1198,7 @@ if archivo is not None:
                     )
 
                 else:
-                    st.info("Sube fotos para associarlas con una máquina y un ID.")
+                    st.info("Sube fotos para asociarlas con una máquina y un ID.")
 
         with tab_id_agrupado:
             st.subheader("Crear ID agrupado desde varios IDs existentes")
@@ -1122,8 +1206,7 @@ if archivo is not None:
             st.write(
                 "Selecciona una máquina y uno o más IDs. "
                 "La app mostrará la información original de cada ID por columna. "
-                "El usuario debe completar manualmente el valor final agrupado. "
-                "En tiempo estimado se muestra la suma como ayuda."
+                "Luego se autocompletará una propuesta editable para el nuevo ID agrupado."
             )
 
             if df_filtrado.empty:
@@ -1206,9 +1289,11 @@ if archivo is not None:
                     st.subheader("Completar información final del ID agrupado")
 
                     st.write(
-                        "Escribe el valor final que tendrá el nuevo ID agrupado. "
-                        "Los campos aparecen vacíos para que el usuario decida el contenido final, "
-                        "excepto el tiempo estimado, donde se muestra la suma como ayuda."
+                        "Los campos se autocompletan con el valor más repetido entre los IDs seleccionados. "
+                        "Puedes modificar cualquier campo manualmente. "
+                        "En descripción de actividad se propone formato por pasos; "
+                        "en EPP y materiales/herramientas se propone formato de lista. "
+                        "En tiempo estimado se muestra la suma como ayuda."
                     )
 
                     valores_finales = {}
@@ -1273,18 +1358,87 @@ if archivo is not None:
                                 key=f"final_{columna}"
                             )
 
-                        elif columna in columnas_text_area:
+                        elif es_columna_descripcion_actividad(columna):
+                            valor_sugerido = descripcion_actividad_por_pasos(
+                                df_ids_seleccionados[columna]
+                            )
+
+                            st.caption(
+                                "Se autocompleta como pasos según los valores originales. "
+                                "Puedes modificarlo manualmente."
+                            )
+
                             valores_finales[columna] = st.text_area(
                                 f"Valor final para {columna}",
-                                value="",
+                                value=valor_sugerido,
+                                height=180,
+                                key=f"final_{columna}"
+                            )
+
+                        elif es_columna_epp(columna):
+                            valor_sugerido = valores_unicos_como_lista(
+                                df_ids_seleccionados[columna]
+                            )
+
+                            st.caption(
+                                "Se autocompleta como lista según los valores originales. "
+                                "Puedes modificarlo manualmente."
+                            )
+
+                            valores_finales[columna] = st.text_area(
+                                f"Valor final para {columna}",
+                                value=valor_sugerido,
+                                height=160,
+                                key=f"final_{columna}"
+                            )
+
+                        elif es_columna_materiales_herramientas(columna):
+                            valor_sugerido = valores_unicos_como_lista(
+                                df_ids_seleccionados[columna]
+                            )
+
+                            st.caption(
+                                "Se autocompleta como lista según los valores originales. "
+                                "Puedes modificarlo manualmente."
+                            )
+
+                            valores_finales[columna] = st.text_area(
+                                f"Valor final para {columna}",
+                                value=valor_sugerido,
+                                height=160,
+                                key=f"final_{columna}"
+                            )
+
+                        elif columna in columnas_text_area:
+                            valor_sugerido = valor_mas_repetido(
+                                df_ids_seleccionados[columna]
+                            )
+
+                            st.caption(
+                                "Se autocompleta con el valor más repetido. "
+                                "Puedes modificarlo manualmente."
+                            )
+
+                            valores_finales[columna] = st.text_area(
+                                f"Valor final para {columna}",
+                                value=valor_sugerido,
                                 height=120,
                                 key=f"final_{columna}"
                             )
 
                         else:
+                            valor_sugerido = valor_mas_repetido(
+                                df_ids_seleccionados[columna]
+                            )
+
+                            st.caption(
+                                "Se autocompleta con el valor más repetido. "
+                                "Puedes modificarlo manualmente."
+                            )
+
                             valores_finales[columna] = st.text_input(
                                 f"Valor final para {columna}",
-                                value="",
+                                value=valor_sugerido,
                                 key=f"final_{columna}"
                             )
 
