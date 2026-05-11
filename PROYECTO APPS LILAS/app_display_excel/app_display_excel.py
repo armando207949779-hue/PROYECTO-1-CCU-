@@ -266,16 +266,41 @@ def filtro_checkboxes_vertical(
         )
         valores_mostrar = valores_mostrar[:max_valores]
 
-    seleccionar_todos = st.checkbox(
-        "Seleccionar todos",
-        value=activar_por_defecto,
-        key=f"todos_{key_prefix}"
-    )
+    # Inicializa el estado de cada checkbox
+    for valor in valores_mostrar:
+        valor_key = re.sub(r"[^A-Za-z0-9_]", "_", valor)
+        checkbox_key = f"chk_{key_prefix}_{valor_key}"
+
+        if checkbox_key not in st.session_state:
+            st.session_state[checkbox_key] = activar_por_defecto
+
+    col_btn_1, col_btn_2 = st.columns(2)
+
+    with col_btn_1:
+        if st.button(
+            "Seleccionar todas",
+            key=f"btn_seleccionar_todas_{key_prefix}"
+        ):
+            for valor in valores_mostrar:
+                valor_key = re.sub(r"[^A-Za-z0-9_]", "_", valor)
+                checkbox_key = f"chk_{key_prefix}_{valor_key}"
+                st.session_state[checkbox_key] = True
+
+    with col_btn_2:
+        if st.button(
+            "Deseleccionar todas",
+            key=f"btn_deseleccionar_todas_{key_prefix}"
+        ):
+            for valor in valores_mostrar:
+                valor_key = re.sub(r"[^A-Za-z0-9_]", "_", valor)
+                checkbox_key = f"chk_{key_prefix}_{valor_key}"
+                st.session_state[checkbox_key] = False
 
     seleccionados = []
 
     for valor in valores_mostrar:
         valor_key = re.sub(r"[^A-Za-z0-9_]", "_", valor)
+        checkbox_key = f"chk_{key_prefix}_{valor_key}"
 
         if conteos is not None:
             etiqueta = f"{valor} ({conteos.get(valor, 0)})"
@@ -284,8 +309,7 @@ def filtro_checkboxes_vertical(
 
         marcado = st.checkbox(
             etiqueta,
-            value=seleccionar_todos,
-            key=f"chk_{key_prefix}_{valor_key}"
+            key=checkbox_key
         )
 
         if marcado:
