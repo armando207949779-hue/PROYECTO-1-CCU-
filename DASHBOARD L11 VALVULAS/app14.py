@@ -589,7 +589,7 @@ def grafico_por_mantencion(df):
 
 
 def grafico_estado_valvulas(df):
-    if df.empty:
+    if df.empty or "Válvula" not in df.columns:
         conteos = pd.Series(0, index=VALVULAS_TODAS)
     else:
         conteos = (
@@ -599,35 +599,140 @@ def grafico_estado_valvulas(df):
             .sort_index()
         )
 
-    colores = [
-        "#27ae60" if c == 0 else "#f39c12" if c <= 2 else "#e74c3c"
-        for c in conteos.values
-    ]
+    estado_data = []
+    columnas_grid = 16
+    total_filas = (len(VALVULAS_TODAS) + columnas_grid - 1) // columnas_grid
 
-    fig = go.Figure(data=[go.Bar(
-        x=conteos.index,
-        y=conteos.values,
-        marker=dict(color=colores),
-        text=conteos.values,
-        textposition="outside",
-        cliponaxis=False,
-        hovertemplate="<b>Válvula %{x}</b><br>Mantenciones: %{y}<extra></extra>"
-    )])
+    for valvula, cantidad in conteos.items():
+        if cantidad == 0:
+            estado = "OK"
+            color = "#27ae60"
+            texto_estado = "Sin registros"
+        elif cantidad <= 2:
+            estado = "Seguimiento"
+            color = "#f39c12"
+            texto_estado = "1 a 2 registros"
+        else:
+            estado = "Crítica"
+            color = "#e74c3c"
+            texto_estado = "3 o más registros"
 
-    aplicar_estilo_figura(fig, "Estado global de las 152 válvulas", 440, t=90, b=95)
+        estado_data.append({
+            "Válvula": valvula,
+            "Mantenciones": cantidad,
+            "Estado": estado,
+            "Color": color,
+            "Texto estado": texto_estado,
+            "Fila": (valvula - 1) // columnas_grid,
+            "Columna": (valvula - 1) % columnas_grid
+        })
+
+    df_estado = pd.DataFrame(estado_data)
+
+    total_ok = int((df_estado["Estado"] == "OK").sum())
+    total_seguimiento = int((df_estado["Estado"] == "Seguimiento").sum())
+    total_criticas = int((df_estado["Estado"] == "Crítica").sum())
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=df_estado["Columna"],
+        y=df_estado["Fila"],
+        mode="markers+text",
+        marker=dict(
+            size=34,
+            color=df_estado["Color"],
+            line=dict(
+                color="white",
+                width=2
+            )
+        ),
+        text=df_estado["Válvula"],
+        textfont=dict(
+            color="white",
+            size=10,
+            family="Arial Black"
+        ),
+        customdata=df_estado[["Mantenciones", "Estado", "Texto estado"]],
+        hovertemplate=(
+            "<b>Válvula %{text}</b><br>"
+            "Estado: <b>%{customdata[1]}</b><br>"
+            "Criterio: %{customdata[2]}<br>"
+            "Mantenciones: <b>%{customdata[0]}</b>"
+            "<extra></extra>"
+        )
+    ))
 
     fig.update_layout(
-        xaxis_title="Número de válvula",
-        yaxis_title="Cantidad de mantenciones",
+        title=dict(
+            text=(
+                "<b>Estado global de válvulas</b><br>"
+                f"<span style='font-size:12px'>"
+                f"OK: {total_ok} · Seguimiento: {total_seguimiento} · Críticas: {total_criticas}"
+                f"</span>"
+            ),
+            x=0.01,
+            font=dict(size=16, color="#1a237e")
+        ),
+        height=max(560, total_filas * 52 + 130),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=40, r=40, t=95, b=65),
         showlegend=False,
-        margin=dict(l=70, r=90, t=90, b=100)
+        hoverlabel=dict(
+            bgcolor="rgba(255,255,255,0.98)",
+            bordercolor="#1f2937",
+            font=dict(color="#111827", size=12)
+        )
     )
 
-    max_y = conteos.max() if not conteos.empty else 1
-    fig.update_yaxes(range=[0, max_y * 1.25 if max_y > 0 else 1])
+    fig.update_xaxes(
+        visible=False,
+        range=[-1, columnas_grid]
+    )
+
+    fig.update_yaxes(
+        visible=False,
+        autorange="reversed",
+        range=[total_filas, -1]
+    )
+
+    y_leyenda = total_filas + 0.7
+
+    fig.add_annotation(
+        x=0,
+        y=y_leyenda,
+        xref="x",
+        yref="y",
+        text="🟢 OK = sin registros",
+        showarrow=False,
+        font=dict(size=12, color="#111827"),
+        align="left"
+    )
+
+    fig.add_annotation(
+        x=5,
+        y=y_leyenda,
+        xref="x",
+        yref="y",
+        text="🟠 Seguimiento = 1 a 2 registros",
+        showarrow=False,
+        font=dict(size=12, color="#111827"),
+        align="left"
+    )
+
+    fig.add_annotation(
+        x=11,
+        y=y_leyenda,
+        xref="x",
+        yref="y",
+        text="🔴 Crítica = 3 o más registros",
+        showarrow=False,
+        font=dict(size=12, color="#111827"),
+        align="left"
+    )
 
     return fig
-
 
 def grafico_valvula_mantencion_burbujas(df):
     if df.empty:
@@ -1019,7 +1124,8 @@ if df_f.empty:
     if mostrar_estado_global:
         st.markdown("## Estado global de válvulas")
         st.caption(
-            "Criterio visual: verde = sin registros, naranjo = 1 a 2 registros, rojo = 3 o más registros."
+            "Vista tipo semáforo: cada círculo representa una válvula. "
+            "Verde = sin registros, naranjo = seguimiento, rojo = crítica."
         )
 
         st.plotly_chart(
@@ -1031,7 +1137,8 @@ else:
     if mostrar_estado_global:
         st.markdown("## Estado global de válvulas")
         st.caption(
-            "Criterio visual: verde = sin registros, naranjo = 1 a 2 registros, rojo = 3 o más registros."
+            "Vista tipo semáforo: cada círculo representa una válvula. "
+            "Verde = sin registros, naranjo = seguimiento, rojo = crítica."
         )
 
         st.plotly_chart(
