@@ -152,6 +152,15 @@ REPOSITORIOS = {
         "B",
         "C"
     ],
+    "Dias De La Semana": [
+        "LUNES",
+        "MARTES",
+        "MIÉRCOLES",
+        "JUEVES",
+        "VIERNES",
+        "SÁBADO",
+        "DOMINGO"
+    ],
     "Epp": [
         "DELANTAL DESECHABLE",
         "GUANTE MECANICO",
@@ -541,6 +550,14 @@ def obtener_tipo_columna_repositorio(columna):
     if col == "turno":
         return "Turno"
 
+    if (
+        "dia de la semana" in col
+        or "dias de la semana" in col
+        or col == "dia"
+        or col == "dias"
+    ):
+        return "Dias De La Semana"
+
     if col == "epp" or col == "e.p.p.":
         return "Epp"
 
@@ -617,14 +634,14 @@ def editor_descripcion_pasos(columna, serie, key_prefix):
     return "\n".join(pasos_finales)
 
 
-def editor_lista_dropdown(columna, opciones, serie, key_prefix):
+def editor_lista_textbox(columna, serie, key_prefix):
     valores_originales = limpiar_valores_serie(serie)
     valores_unicos = list(dict.fromkeys(valores_originales.tolist()))
 
     key_cantidad = f"{key_prefix}_cantidad"
 
     if key_cantidad not in st.session_state:
-        st.session_state[key_cantidad] = max(len(valores_unicos), 1)
+        st.session_state[key_cantidad] = 1
 
     st.write(f"¿Cuántos elementos colocar en **{columna}**?")
 
@@ -642,24 +659,37 @@ def editor_lista_dropdown(columna, opciones, serie, key_prefix):
     seleccionados = []
 
     for i in range(st.session_state[key_cantidad]):
-        sugerido = valores_unicos[i] if i < len(valores_unicos) else ""
-        index_sugerido = indice_opcion_sugerida(opciones, sugerido)
+        valor_default = valores_unicos[i] if i < len(valores_unicos) else ""
 
-        valor = st.selectbox(
+        valor = st.text_input(
             f"{columna} {i + 1}",
-            options=opciones,
-            index=index_sugerido,
+            value=valor_default,
             key=f"{key_prefix}_{i + 1}"
         )
 
-        seleccionados.append(valor)
+        valor = valor.strip()
+
+        if valor:
+            seleccionados.append(valor)
 
     seleccionados = list(dict.fromkeys(seleccionados))
 
     return "\n".join([f"- {valor}" for valor in seleccionados])
 
 
-def selector_ids_con_checkboxes(ids_disponibles, key_prefix):
+def convertir_dataframe_a_mayusculas(df_base):
+    df_mayusculas = df_base.copy()
+
+    for columna in df_mayusculas.columns:
+        if df_mayusculas[columna].dtype == "object":
+            df_mayusculas[columna] = df_mayusculas[columna].apply(
+                lambda valor: valor.upper() if isinstance(valor, str) else valor
+            )
+
+    return df_mayusculas
+
+
+def selector_ids_con_checkboxes(ids_disponibles, key_prefix, columnas=4):
     st.markdown("**Selecciona los IDs que quieres agrupar**")
 
     buscar_id = st.text_input(
@@ -690,18 +720,20 @@ def selector_ids_con_checkboxes(ids_disponibles, key_prefix):
                 st.session_state[f"{key_prefix}_id_{id_key}"] = False
 
     ids_seleccionados = []
+    columnas_checkbox = st.columns(columnas)
 
-    for id_valor in ids_mostrar:
+    for idx, id_valor in enumerate(ids_mostrar):
         id_key = re.sub(r"[^A-Za-z0-9_]", "_", str(id_valor))
         checkbox_key = f"{key_prefix}_id_{id_key}"
 
         if checkbox_key not in st.session_state:
             st.session_state[checkbox_key] = False
 
-        marcado = st.checkbox(
-            str(id_valor),
-            key=checkbox_key
-        )
+        with columnas_checkbox[idx % columnas]:
+            marcado = st.checkbox(
+                str(id_valor),
+                key=checkbox_key
+            )
 
         if marcado:
             ids_seleccionados.append(str(id_valor))
@@ -1462,7 +1494,8 @@ if archivo is not None:
                 with st.expander("Seleccionar IDs con checkboxes", expanded=True):
                     ids_seleccionados = selector_ids_con_checkboxes(
                         ids_disponibles=ids_disponibles_agrupado,
-                        key_prefix="ids_agrupado"
+                        key_prefix="ids_agrupado",
+                        columnas=4
                     )
 
                 if ids_seleccionados:
@@ -1503,10 +1536,10 @@ if archivo is not None:
                     st.subheader("Completar información final del ID agrupado")
 
                     st.write(
-                        "Los campos se completan usando repositorios de opciones para evitar valores manuales. "
-                        "Lila, criticidad, punto Q, estado equipo, frecuencia y turno usan dropdown. "
+                        "Los campos se completan usando repositorios de opciones para evitar errores. "
+                        "Lila, criticidad, punto Q, estado equipo, frecuencia, turno y días de la semana usan dropdown. "
                         "Descripción actividad permite agregar o quitar pasos. "
-                        "EPP y materiales/herramientas permiten agregar o quitar elementos desde dropdowns. "
+                        "EPP y materiales/herramientas usan cajas de texto, parten con 1 elemento y permiten agregar más. "
                         "En tiempo estimado se muestra la suma como ayuda."
                     )
 
@@ -1580,24 +1613,22 @@ if archivo is not None:
 
                         elif tipo_columna == "Epp":
                             st.caption(
-                                "Selecciona los EPP desde el repositorio. No se ingresan valores manuales."
+                                "Ingresa los EPP en cajas de texto. Por defecto se muestra 1 elemento y puedes agregar más."
                             )
 
-                            valores_finales[columna] = editor_lista_dropdown(
+                            valores_finales[columna] = editor_lista_textbox(
                                 columna=columna,
-                                opciones=REPOSITORIOS["Epp"],
                                 serie=df_ids_seleccionados[columna],
                                 key_prefix=f"final_{columna}"
                             )
 
                         elif tipo_columna == "Materiales/Herramientas":
                             st.caption(
-                                "Selecciona materiales o herramientas desde el repositorio. No se ingresan valores manuales."
+                                "Ingresa materiales o herramientas en cajas de texto. Por defecto se muestra 1 elemento y puedes agregar más."
                             )
 
-                            valores_finales[columna] = editor_lista_dropdown(
+                            valores_finales[columna] = editor_lista_textbox(
                                 columna=columna,
-                                opciones=REPOSITORIOS["Materiales/Herramientas"],
                                 serie=df_ids_seleccionados[columna],
                                 key_prefix=f"final_{columna}"
                             )
@@ -1608,7 +1639,8 @@ if archivo is not None:
                             "Punto Q",
                             "Estado Equipo",
                             "Frecuencia",
-                            "Turno"
+                            "Turno",
+                            "Dias De La Semana"
                         ]:
                             st.caption(
                                 "Selecciona el valor desde el repositorio de opciones."
@@ -1647,6 +1679,7 @@ if archivo is not None:
                     ]
 
                     df_id_agrupado = df_id_agrupado[columnas_ordenadas]
+                    df_id_agrupado = convertir_dataframe_a_mayusculas(df_id_agrupado)
 
                     st.dataframe(
                         df_id_agrupado,
@@ -1661,7 +1694,7 @@ if archivo is not None:
                     )
 
                     nombre_archivo_agrupado = limpiar_nombre_archivo(
-                        f"{valores_finales['Id Estándar']}_{valores_finales['Maquina']}"
+                        f"{str(valores_finales['Id Estándar']).upper()}_{str(valores_finales['Maquina']).upper()}"
                     )
 
                     st.download_button(
