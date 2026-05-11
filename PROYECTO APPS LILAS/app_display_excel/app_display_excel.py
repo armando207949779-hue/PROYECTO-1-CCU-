@@ -12,7 +12,7 @@ import base64
 # CONFIGURACIÓN GENERAL
 # =====================================================
 st.set_page_config(
-    page_title="Visor Excel L2",
+    page_title="Visor Excel / Parquet L2",
     page_icon="🏭",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -109,8 +109,8 @@ st.markdown(
 )
 
 archivo = st.file_uploader(
-    "Sube tu archivo Excel",
-    type=["xlsx", "xls"]
+    "Sube tu archivo Excel o Parquet",
+    type=["xlsx", "xls", "parquet"]
 )
 
 # =====================================================
@@ -360,23 +360,44 @@ def tabla_valores_originales_simple(df_base, columna):
     return tabla
 
 
-# =====================================================
-# APP PRINCIPAL
-# =====================================================
-if archivo is not None:
-    try:
-        excel = pd.ExcelFile(archivo, engine="openpyxl")
+def cargar_archivo(archivo_subido):
+    nombre_archivo = archivo_subido.name.lower()
+
+    if nombre_archivo.endswith(".parquet"):
+        df_cargado = pd.read_parquet(archivo_subido, engine="pyarrow")
+        nombre_origen = "Archivo Parquet"
+        return df_cargado, nombre_origen
+
+    if nombre_archivo.endswith(".xlsx") or nombre_archivo.endswith(".xls"):
+        excel = pd.ExcelFile(archivo_subido, engine="openpyxl")
 
         hoja = st.selectbox(
             "Selecciona una hoja",
             excel.sheet_names
         )
 
-        df = pd.read_excel(
-            archivo,
+        df_cargado = pd.read_excel(
+            archivo_subido,
             sheet_name=hoja,
             engine="openpyxl"
         )
+
+        return df_cargado, hoja
+
+    raise ValueError("Formato no soportado. Usa Excel o Parquet.")
+
+
+# =====================================================
+# APP PRINCIPAL
+# =====================================================
+if archivo is not None:
+    try:
+        df, hoja = cargar_archivo(archivo)
+
+        if archivo.name.lower().endswith(".parquet"):
+            st.success("Archivo Parquet cargado correctamente.")
+        else:
+            st.success(f"Archivo Excel cargado correctamente. Hoja: {hoja}")
 
         df.columns = [
             str(col).strip() if str(col) != "nan" else f"Columna_{i + 1}"
@@ -384,18 +405,19 @@ if archivo is not None:
         ]
 
         if "Maquina" not in df.columns:
-            st.error("No existe la columna 'Maquina' en el archivo Excel.")
+            st.error("No existe la columna 'Maquina' en el archivo.")
             st.write("Columnas encontradas:")
             st.write(list(df.columns))
             st.stop()
 
         if "Id Estándar" not in df.columns:
-            st.error("No existe la columna 'Id Estándar' en el archivo Excel.")
+            st.error("No existe la columna 'Id Estándar' en el archivo.")
             st.write("Columnas encontradas:")
             st.write(list(df.columns))
             st.stop()
 
         st.write(
+            f"Origen: **{hoja}** | "
             f"Filas originales: **{df.shape[0]}** | "
             f"Columnas originales: **{df.shape[1]}**"
         )
@@ -1068,7 +1090,7 @@ if archivo is not None:
                     )
 
                 else:
-                    st.info("Sube fotos para asociarlas con una máquina y un ID.")
+                    st.info("Sube fotos para associarlas con una máquina y un ID.")
 
         with tab_id_agrupado:
             st.subheader("Crear ID agrupado desde varios IDs existentes")
@@ -1334,11 +1356,11 @@ if archivo is not None:
 
     except ImportError:
         st.error("Falta instalar alguna librería necesaria.")
-        st.code("pip install streamlit pandas openpyxl plotly")
+        st.code("pip install streamlit pandas openpyxl plotly pyarrow")
 
     except Exception as e:
-        st.error("No se pudo cargar el archivo Excel.")
+        st.error("No se pudo cargar el archivo.")
         st.exception(e)
 
 else:
-    st.info("Sube un archivo Excel para mostrar el display.")
+    st.info("Sube un archivo Excel o Parquet para mostrar el display.")
