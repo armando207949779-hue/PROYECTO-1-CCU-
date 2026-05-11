@@ -1,6 +1,6 @@
 """
 Portal Global CCU
-App principal para navegar entre dashboards y formularios de Línea 2 y Línea 11.
+App principal para navegar entre dashboards de Línea 2 y Línea 11.
 Incluye pestaña simple de alertas por línea.
 
 Ubicación:
@@ -31,12 +31,6 @@ APP_L2_TULIPAS = PROJECT_DIR / "DASHBOARD L2 TULIPAS" / "app13.py"
 APP_L2_VALVULAS = PROJECT_DIR / "DASHBOARD L2 VALVULAS" / "app13.py"
 APP_L11_TULIPAS = PROJECT_DIR / "DASHBOARD L11 TULIPAS" / "app9.py"
 APP_L11_VALVULAS = PROJECT_DIR / "DASHBOARD L11 VALVULAS" / "app14.py"
-
-# Formularios
-FORM_L2_TULIPAS = PROJECT_DIR / "FORMULARIO L2 TULIPAS" / "app7.py"
-FORM_L2_VALVULAS = PROJECT_DIR / "FORMULARIO L2 VALVULAS" / "app6.py"
-FORM_L11_TULIPAS = PROJECT_DIR / "FORMULARIO L11 TULIPAS" / "app.py"
-FORM_L11_VALVULAS = PROJECT_DIR / "FORMULARIO L11 VALVULAS" / "app7.py"
 
 
 # =====================================================
@@ -358,7 +352,7 @@ def pagina_inicio():
         """
         <div class='portal-header'>
             <h1>Portal Área de Operaciones CCU</h1>
-            <p>Selecciona un dashboard o formulario desde el menú lateral.</p>
+            <p>Selecciona un dashboard desde el menú lateral.</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -398,25 +392,7 @@ def pagina_inicio():
 
     st.markdown("---")
 
-    st.markdown("## Formularios")
-
-    f1, f2 = st.columns(2)
-
-    with f1:
-        st.success(
-            "**Formularios Línea 2**\n\n"
-            "Registro operacional para tulipas y válvulas."
-        )
-
-    with f2:
-        st.success(
-            "**Formularios Línea 11**\n\n"
-            "Registro operacional para tulipas y válvulas."
-        )
-
-    st.markdown("---")
-
-    st.caption("Portal central conectado a dashboards y formularios Streamlit del repositorio GitHub.")
+    st.caption("Portal central conectado a dashboards Streamlit del repositorio GitHub.")
 
 
 # =====================================================
@@ -592,17 +568,10 @@ def pagina_alertas():
 # =====================================================
 
 apps_requeridas = {
-    # Dashboards
     "Dashboard Línea 2 · Tulipas": APP_L2_TULIPAS,
     "Dashboard Línea 2 · Válvulas": APP_L2_VALVULAS,
     "Dashboard Línea 11 · Tulipas": APP_L11_TULIPAS,
     "Dashboard Línea 11 · Válvulas": APP_L11_VALVULAS,
-
-    # Formularios
-    "Formulario Línea 2 · Tulipas": FORM_L2_TULIPAS,
-    "Formulario Línea 2 · Válvulas": FORM_L2_VALVULAS,
-    "Formulario Línea 11 · Tulipas": FORM_L11_TULIPAS,
-    "Formulario Línea 11 · Válvulas": FORM_L11_VALVULAS,
 }
 
 apps_faltantes = {
@@ -630,7 +599,7 @@ if apps_faltantes:
 
 
 # =====================================================
-# NAVEGACIÓN ENTRE DASHBOARDS Y FORMULARIOS
+# NAVEGACIÓN ENTRE DASHBOARDS
 # =====================================================
 
 pagina = st.navigation(
@@ -675,34 +644,6 @@ pagina = st.navigation(
                 title="Válvulas",
                 icon="📊",
                 url_path="dashboard-linea-11-valvulas"
-            ),
-        ],
-        "Formularios · Línea 2": [
-            st.Page(
-                FORM_L2_TULIPAS,
-                title="Tulipas",
-                icon="📝",
-                url_path="formulario-linea-2-tulipas"
-            ),
-            st.Page(
-                FORM_L2_VALVULAS,
-                title="Válvulas",
-                icon="📝",
-                url_path="formulario-linea-2-valvulas"
-            ),
-        ],
-        "Formularios · Línea 11": [
-            st.Page(
-                FORM_L11_TULIPAS,
-                title="Tulipas",
-                icon="📝",
-                url_path="formulario-linea-11-tulipas"
-            ),
-            st.Page(
-                FORM_L11_VALVULAS,
-                title="Válvulas",
-                icon="📝",
-                url_path="formulario-linea-11-valvulas"
             ),
         ],
     },
