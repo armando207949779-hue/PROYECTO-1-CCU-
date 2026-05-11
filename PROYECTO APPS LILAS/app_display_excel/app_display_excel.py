@@ -100,7 +100,7 @@ st.markdown(
     """
     <div style='text-align:center; margin-bottom:1.6rem;'>
         <h1 style='margin-top:0;'>
-            Visor, análisis, fotos e IDs agrupados<br>
+            Visor, análisis e IDs agrupados<br>
             Estándares Visuales LILA
         </h1>
     </div>
@@ -399,35 +399,26 @@ def filtro_checkboxes_vertical(
     return seleccionados
 
 
-def crear_nombre_foto(id_estandar, maquina, nombre_original):
+def crear_nombre_foto_id_agrupado(id_estandar, nombre_original, indice_foto):
     extension = os.path.splitext(nombre_original)[1].lower()
-
-    id_limpio = limpiar_nombre_archivo(id_estandar)
-    maquina_limpia = limpiar_nombre_archivo(maquina)
-
-    nombre = f"{id_limpio}_{maquina_limpia}{extension}"
-
+    id_limpio = limpiar_nombre_archivo(str(id_estandar).upper())
+    nombre = f"{id_limpio}_FOTO_{indice_foto:02d}{extension}"
     return nombre
 
 
-def crear_zip_fotos_por_maquina(fotos_configuradas):
+def crear_zip_fotos_id_agrupado(fotos_subidas, id_estandar_final):
     zip_buffer = BytesIO()
+    id_limpio = limpiar_nombre_archivo(str(id_estandar_final).upper())
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for item in fotos_configuradas:
-            archivo_foto = item["archivo"]
-            id_estandar = item["id_estandar"]
-            maquina = item["maquina"]
-
-            carpeta_maquina = limpiar_nombre_archivo(maquina)
-
-            nombre_foto = crear_nombre_foto(
-                id_estandar=id_estandar,
-                maquina=maquina,
-                nombre_original=archivo_foto.name
+        for idx, archivo_foto in enumerate(fotos_subidas, start=1):
+            nombre_foto = crear_nombre_foto_id_agrupado(
+                id_estandar=id_estandar_final,
+                nombre_original=archivo_foto.name,
+                indice_foto=idx
             )
 
-            ruta_dentro_zip = f"{carpeta_maquina}/{nombre_foto}"
+            ruta_dentro_zip = f"{id_limpio}/{nombre_foto}"
 
             zip_file.writestr(
                 ruta_dentro_zip,
@@ -593,7 +584,7 @@ def descripcion_original_a_pasos(serie):
     valores_unicos = list(dict.fromkeys(valores.tolist()))
 
     if not valores_unicos:
-        return [""]
+        return ["", "", ""]
 
     return valores_unicos
 
@@ -629,7 +620,7 @@ def editor_descripcion_pasos(columna, serie, key_prefix):
             key=f"{key_prefix}_paso_{i + 1}"
         )
 
-        pasos_finales.append(f"Paso {i + 1}: {paso.strip()}")
+        pasos_finales.append(f"PASO {i + 1}: {paso.strip()}")
 
     return "\n".join(pasos_finales)
 
@@ -1048,11 +1039,10 @@ if archivo is not None:
                         else:
                             df_filtrado = df_filtrado.iloc[0:0]
 
-        tab_display, tab_analisis, tab_fotos, tab_id_agrupado = st.tabs(
+        tab_display, tab_analisis, tab_id_agrupado = st.tabs(
             [
                 "Display filtrado",
                 "Análisis de data filtrada",
-                "Fotos por ID / Máquina",
                 "Crear ID agrupado"
             ]
         )
@@ -1261,190 +1251,6 @@ if archivo is not None:
                 else:
                     st.info("No hay columnas numéricas para resumir.")
 
-        with tab_fotos:
-            st.subheader("Subir fotos y asociarlas con ID / Máquina")
-
-            st.write(
-                "Cada foto se renombra automáticamente con el formato "
-                "**ID_Maquina.extensión** y se descarga en un ZIP con carpetas por máquina."
-            )
-
-            if df_filtrado.empty:
-                st.warning("No hay datos filtrados disponibles para asociar fotos.")
-            else:
-                df_ids = df_filtrado.copy()
-
-                df_ids["Id Estándar"] = df_ids["Id Estándar"].astype(str)
-                df_ids["Maquina"] = df_ids["Maquina"].astype(str)
-
-                columnas_info = ["Id Estándar", "Maquina"]
-
-                if "Detalle Maquina" in df_ids.columns:
-                    columnas_info.append("Detalle Maquina")
-
-                if "Descripción Estándar Visual" in df_ids.columns:
-                    columnas_info.append("Descripción Estándar Visual")
-
-                if "Descripción Actividad" in df_ids.columns:
-                    columnas_info.append("Descripción Actividad")
-
-                df_opciones = (
-                    df_ids[columnas_info]
-                    .drop_duplicates()
-                    .sort_values(["Maquina", "Id Estándar"])
-                    .reset_index(drop=True)
-                )
-
-                st.write(
-                    f"IDs disponibles según filtros actuales: "
-                    f"**{df_opciones.shape[0]}**"
-                )
-
-                with st.expander("Ver IDs disponibles", expanded=False):
-                    st.dataframe(
-                        df_opciones,
-                        use_container_width=True,
-                        height=350
-                    )
-
-                fotos_subidas = st.file_uploader(
-                    "Sube una o varias fotos",
-                    type=["jpg", "jpeg", "png", "webp"],
-                    accept_multiple_files=True
-                )
-
-                if fotos_subidas:
-                    st.subheader("Asociar cada foto")
-
-                    maquinas_disponibles = (
-                        df_opciones["Maquina"]
-                        .dropna()
-                        .astype(str)
-                        .value_counts()
-                        .index
-                        .tolist()
-                    )
-
-                    fotos_configuradas = []
-
-                    for idx, foto in enumerate(fotos_subidas):
-                        st.divider()
-
-                        col_foto, col_config = st.columns([1, 2])
-
-                        with col_foto:
-                            st.image(
-                                foto,
-                                caption=foto.name,
-                                use_container_width=True
-                            )
-
-                        with col_config:
-                            maquina_seleccionada = st.selectbox(
-                                f"Selecciona máquina para: {foto.name}",
-                                options=maquinas_disponibles,
-                                key=f"maquina_foto_{idx}_{foto.name}"
-                            )
-
-                            df_ids_maquina = df_opciones[
-                                df_opciones["Maquina"].astype(str)
-                                == str(maquina_seleccionada)
-                            ].copy()
-
-                            ids_disponibles = (
-                                df_ids_maquina["Id Estándar"]
-                                .astype(str)
-                                .sort_values()
-                                .unique()
-                                .tolist()
-                            )
-
-                            id_seleccionado = st.selectbox(
-                                f"Selecciona ID para: {foto.name}",
-                                options=ids_disponibles,
-                                key=f"id_foto_{idx}_{foto.name}"
-                            )
-
-                            fila_id = df_ids_maquina[
-                                df_ids_maquina["Id Estándar"].astype(str)
-                                == str(id_seleccionado)
-                            ].iloc[0]
-
-                            nombre_final = crear_nombre_foto(
-                                id_estandar=id_seleccionado,
-                                maquina=maquina_seleccionada,
-                                nombre_original=foto.name
-                            )
-
-                            carpeta_final = limpiar_nombre_archivo(
-                                maquina_seleccionada
-                            )
-
-                            st.write(f"**ID seleccionado:** {id_seleccionado}")
-                            st.write(f"**Máquina seleccionada:** {maquina_seleccionada}")
-                            st.write(f"**Carpeta:** `{carpeta_final}/`")
-                            st.write(f"**Nombre final:** `{nombre_final}`")
-
-                            if "Detalle Maquina" in df_ids_maquina.columns:
-                                st.write(
-                                    f"**Detalle Máquina:** "
-                                    f"{fila_id.get('Detalle Maquina', '')}"
-                                )
-
-                            if "Descripción Estándar Visual" in df_ids_maquina.columns:
-                                st.write(
-                                    f"**Descripción Estándar Visual:** "
-                                    f"{fila_id.get('Descripción Estándar Visual', '')}"
-                                )
-
-                            if "Descripción Actividad" in df_ids_maquina.columns:
-                                st.write(
-                                    f"**Descripción Actividad:** "
-                                    f"{fila_id.get('Descripción Actividad', '')}"
-                                )
-
-                            fotos_configuradas.append(
-                                {
-                                    "archivo": foto,
-                                    "id_estandar": id_seleccionado,
-                                    "maquina": maquina_seleccionada,
-                                    "nombre_final": nombre_final,
-                                    "carpeta": carpeta_final
-                                }
-                            )
-
-                    st.subheader("Resumen de fotos configuradas")
-
-                    resumen_fotos = pd.DataFrame(
-                        [
-                            {
-                                "Foto original": item["archivo"].name,
-                                "Id Estándar": item["id_estandar"],
-                                "Maquina": item["maquina"],
-                                "Carpeta": item["carpeta"],
-                                "Nombre final": item["nombre_final"]
-                            }
-                            for item in fotos_configuradas
-                        ]
-                    )
-
-                    st.dataframe(
-                        resumen_fotos,
-                        use_container_width=True
-                    )
-
-                    zip_fotos = crear_zip_fotos_por_maquina(fotos_configuradas)
-
-                    st.download_button(
-                        label="Descargar fotos renombradas por máquina en ZIP",
-                        data=zip_fotos,
-                        file_name="fotos_por_maquina.zip",
-                        mime="application/zip"
-                    )
-
-                else:
-                    st.info("Sube fotos para asociarlas con una máquina y un ID.")
-
         with tab_id_agrupado:
             st.subheader("Crear ID agrupado desde varios IDs existentes")
 
@@ -1544,11 +1350,14 @@ if archivo is not None:
 
                     valores_finales = {}
 
-                    ids_unidos = "_".join(ids_seleccionados)
+                    ids_unidos = "_".join([
+                        limpiar_nombre_archivo(str(id_valor)).upper()
+                        for id_valor in ids_seleccionados
+                    ])
 
                     valores_finales["Id Estándar"] = st.text_input(
                         "Id Estándar final",
-                        value=f"AGRUPADO_{ids_unidos}",
+                        value=f"ID_{ids_unidos}",
                         key="final_id_estandar"
                     )
 
@@ -1692,8 +1501,16 @@ if archivo is not None:
                         nombre_hoja="ID agrupado"
                     )
 
+                    id_estandar_final_mayuscula = str(
+                        df_id_agrupado.iloc[0]["Id Estándar"]
+                    ).upper()
+
+                    maquina_final_mayuscula = str(
+                        df_id_agrupado.iloc[0]["Maquina"]
+                    ).upper()
+
                     nombre_archivo_agrupado = limpiar_nombre_archivo(
-                        f"{str(valores_finales['Id Estándar']).upper()}_{str(valores_finales['Maquina']).upper()}"
+                        f"{id_estandar_final_mayuscula}_{maquina_final_mayuscula}"
                     )
 
                     st.download_button(
@@ -1702,6 +1519,73 @@ if archivo is not None:
                         file_name=f"{nombre_archivo_agrupado}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
+
+                    st.divider()
+
+                    st.subheader("Fotos opcionales del ID agrupado")
+
+                    st.write(
+                        "Puedes subir una o más fotos. "
+                        "Las fotos quedarán asociadas automáticamente al Id Estándar final "
+                        "y se renombrarán usando ese ID."
+                    )
+
+                    fotos_id_agrupado = st.file_uploader(
+                        "Sube una o más fotos para este ID agrupado",
+                        type=["jpg", "jpeg", "png", "webp"],
+                        accept_multiple_files=True,
+                        key="fotos_id_agrupado"
+                    )
+
+                    if fotos_id_agrupado:
+                        resumen_fotos_agrupado = []
+
+                        st.write(
+                            f"**ID asociado automáticamente:** "
+                            f"`{id_estandar_final_mayuscula}`"
+                        )
+
+                        for idx, foto in enumerate(fotos_id_agrupado, start=1):
+                            nombre_final_foto = crear_nombre_foto_id_agrupado(
+                                id_estandar=id_estandar_final_mayuscula,
+                                nombre_original=foto.name,
+                                indice_foto=idx
+                            )
+
+                            resumen_fotos_agrupado.append(
+                                {
+                                    "Foto original": foto.name,
+                                    "Id Estándar asociado": id_estandar_final_mayuscula,
+                                    "Nombre final": nombre_final_foto
+                                }
+                            )
+
+                        st.dataframe(
+                            pd.DataFrame(resumen_fotos_agrupado),
+                            use_container_width=True
+                        )
+
+                        with st.expander("Vista previa de fotos cargadas", expanded=False):
+                            for foto in fotos_id_agrupado:
+                                st.image(
+                                    foto,
+                                    caption=foto.name,
+                                    use_container_width=True
+                                )
+
+                        zip_fotos_id_agrupado = crear_zip_fotos_id_agrupado(
+                            fotos_subidas=fotos_id_agrupado,
+                            id_estandar_final=id_estandar_final_mayuscula
+                        )
+
+                        st.download_button(
+                            label="Descargar fotos del ID agrupado en ZIP",
+                            data=zip_fotos_id_agrupado,
+                            file_name=f"fotos_{id_estandar_final_mayuscula}.zip",
+                            mime="application/zip"
+                        )
+                    else:
+                        st.info("La carga de fotos es opcional.")
 
                     st.divider()
 
