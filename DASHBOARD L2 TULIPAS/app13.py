@@ -738,57 +738,109 @@ def grafico_top_tulipas(df, top_n=15):
         .head(top_n)
     )
 
+    if top.empty:
+        fig = go.Figure()
+        aplicar_estilo_figura(fig, f"Top {top_n} tulipas más intervenidas", 520)
+        fig.update_layout(
+            xaxis_title="Intervenciones",
+            yaxis_title="Tulipa",
+            showlegend=False
+        )
+        return fig
+
+    top["Ranking"] = range(1, len(top) + 1)
+
     top["Etiqueta"] = (
-        top["Equipo"].astype(str).str[:4] + " " +
-        top["Formato"].astype(str) +
-        " | C" + top["Cabezal"].astype(str) +
+        "#" + top["Ranking"].astype(str) + "  " +
+        top["Equipo"].astype(str) + " · " +
+        top["Formato"].astype(str) + " · " +
+        "C" + top["Cabezal"].astype(str) +
         "-T" + top["Tulipa"].astype(str)
     )
 
     top["Detalle"] = (
-        top["Equipo"].astype(str) +
-        " · " +
-        top["Formato"].astype(str) +
-        "<br>Cabezal: " +
-        top["Cabezal"].astype(str) +
-        "<br>Tulipa: " +
-        top["Tulipa"].astype(str)
+        "<b>" + top["Equipo"].astype(str) + "</b>" +
+        "<br>Formato: <b>" + top["Formato"].astype(str) + "</b>" +
+        "<br>Cabezal: <b>" + top["Cabezal"].astype(str) + "</b>" +
+        "<br>Tulipa: <b>" + top["Tulipa"].astype(str) + "</b>" +
+        "<br>Ranking: <b>#" + top["Ranking"].astype(str) + "</b>"
     )
 
-    fig = go.Figure(go.Bar(
-        x=top["Etiqueta"],
-        y=top["Frecuencia"],
+    # Orden ascendente para que, al usar barras horizontales,
+    # la tulipa con mayor frecuencia quede arriba.
+    top_plot = top.sort_values("Frecuencia", ascending=True).copy()
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        x=top_plot["Frecuencia"],
+        y=top_plot["Etiqueta"],
+        orientation="h",
         marker=dict(
-            color=top["Frecuencia"],
+            color=top_plot["Frecuencia"],
             colorscale="YlOrRd",
-            showscale=False
+            showscale=False,
+            line=dict(color="rgba(80,80,80,0.35)", width=1)
         ),
-        text=top["Frecuencia"],
+        text=top_plot["Frecuencia"],
         textposition="outside",
         cliponaxis=False,
-        customdata=top["Detalle"],
+        customdata=top_plot["Detalle"],
         hovertemplate=(
-            "<b>%{customdata}</b><br>"
-            "Frecuencia: <b>%{y}</b>"
+            "%{customdata}<br>"
+            "Intervenciones: <b>%{x}</b>"
             "<extra></extra>"
         )
     ))
 
-    aplicar_estilo_figura(fig, f"Top {top_n} tulipas más intervenidas", 540, t=90, b=175)
-    fig.update_layout(
-        xaxis_title="Tulipa",
-        yaxis_title="Registros",
-        showlegend=False,
-        margin=dict(l=70, r=90, t=90, b=180)
+    aplicar_estilo_figura(
+        fig,
+        f"Top {top_n} tulipas más intervenidas",
+        height=620,
+        l=220,
+        r=110,
+        t=90,
+        b=70
     )
 
-    fig.update_xaxes(tickangle=-45)
+    max_x = top["Frecuencia"].max() if not top.empty else 1
 
-    max_y = top["Frecuencia"].max() if not top.empty else 1
-    fig.update_yaxes(range=[0, max_y * 1.25])
+    fig.update_layout(
+        xaxis_title="Intervenciones",
+        yaxis_title="",
+        showlegend=False,
+        margin=dict(l=245, r=115, t=90, b=70),
+        bargap=0.28
+    )
+
+    fig.update_xaxes(
+        range=[0, max_x * 1.20],
+        tickformat=",d"
+    )
+
+    fig.update_yaxes(
+        automargin=True,
+        tickfont=dict(size=11)
+    )
+
+    # Destaca visualmente la tulipa más crítica.
+    top_1 = top.iloc[0]
+
+    fig.add_annotation(
+        x=top_1["Frecuencia"],
+        y=top_1["Etiqueta"],
+        text="Más crítica",
+        showarrow=True,
+        arrowhead=2,
+        ax=40,
+        ay=-25,
+        bgcolor="rgba(255,255,255,0.92)",
+        bordercolor="rgba(80,80,80,0.35)",
+        borderwidth=1,
+        font=dict(size=11, color="#b71c1c")
+    )
 
     return fig
-
 
 # =====================================================
 # CARGA
