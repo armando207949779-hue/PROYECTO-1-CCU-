@@ -114,8 +114,81 @@ archivo = st.file_uploader(
 )
 
 # =====================================================
-# FUNCIONES
+# REPOSITORIOS DE OPCIONES
 # =====================================================
+REPOSITORIOS = {
+    "Lila": [
+        "LIMPIEZA",
+        "INSPECCIÓN",
+        "LUBRICACIÓN",
+        "AJUSTE"
+    ],
+    "Criticidad": [
+        "BAJA",
+        "MEDIA",
+        "ALTA"
+    ],
+    "Punto Q": [
+        "SI",
+        "NO"
+    ],
+    "Estado Equipo": [
+        "ENCENDIDO",
+        "APAGADO"
+    ],
+    "Frecuencia": [
+        "POR TURNO",
+        "DIARIA",
+        "SEMANAL",
+        "QUINCENAL",
+        "MENSUAL",
+        "BIMESTRAL",
+        "TRIMESTRAL",
+        "SEMESTRAL",
+        "ANUAL"
+    ],
+    "Turno": [
+        "A",
+        "B",
+        "C"
+    ],
+    "Epp": [
+        "DELANTAL DESECHABLE",
+        "GUANTE MECANICO",
+        "LENTES DE SEGURIDAD",
+        "ZAPATOS DE SEGURIDAD"
+    ],
+    "Materiales/Herramientas": [
+        "PAÑO",
+        "ESCOBILLA",
+        "LLAVE",
+        "DESTORNILLADOR",
+        "LUBRICANTE",
+        "ALCOHOL",
+        "ATOMIZADOR",
+        "BROCHA",
+        "ESPÁTULA",
+        "HERRAMIENTA MANUAL"
+    ]
+}
+
+# =====================================================
+# FUNCIONES GENERALES
+# =====================================================
+def normalizar_texto(texto):
+    return (
+        str(texto)
+        .strip()
+        .lower()
+        .replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+        .replace("ñ", "n")
+    )
+
+
 def filtrar_texto(df_base, columna, texto, tipo_filtro):
     if texto is None or str(texto).strip() == "":
         return df_base
@@ -410,89 +483,230 @@ def cargar_archivo(archivo_subido):
     raise ValueError("Formato no soportado. Usa Excel o Parquet.")
 
 
-def limpiar_serie_texto(serie):
-    serie_limpia = (
+def limpiar_valores_serie(serie):
+    valores = (
         serie
         .dropna()
         .astype(str)
         .str.strip()
     )
 
-    serie_limpia = serie_limpia[
-        (serie_limpia != "")
-        & (serie_limpia.str.lower() != "nan")
-        & (serie_limpia.str.lower() != "none")
-        & (serie_limpia.str.lower() != "nat")
+    valores = valores[
+        (valores != "")
+        & (valores.str.lower() != "nan")
+        & (valores.str.lower() != "none")
+        & (valores.str.lower() != "nat")
     ]
 
-    return serie_limpia
+    return valores
 
 
 def valor_mas_repetido(serie):
-    serie_limpia = limpiar_serie_texto(serie)
+    valores = limpiar_valores_serie(serie)
 
-    if serie_limpia.empty:
+    if valores.empty:
         return ""
 
-    return serie_limpia.value_counts().index[0]
+    return valores.value_counts().index[0]
 
 
-def valores_unicos_como_lista(serie):
-    serie_limpia = limpiar_serie_texto(serie)
+def indice_opcion_sugerida(opciones, sugerido):
+    sugerido_norm = normalizar_texto(sugerido)
 
-    if serie_limpia.empty:
-        return ""
+    for i, opcion in enumerate(opciones):
+        if normalizar_texto(opcion) == sugerido_norm:
+            return i
 
-    valores_unicos = list(dict.fromkeys(serie_limpia.tolist()))
-
-    return "\n".join([f"- {valor}" for valor in valores_unicos])
-
-
-def descripcion_actividad_por_pasos(serie):
-    serie_limpia = limpiar_serie_texto(serie)
-
-    if serie_limpia.empty:
-        return "Paso 1: \nPaso 2: \nPaso 3: "
-
-    valores_unicos = list(dict.fromkeys(serie_limpia.tolist()))
-
-    pasos = []
-
-    for idx, valor in enumerate(valores_unicos, start=1):
-        pasos.append(f"Paso {idx}: {valor}")
-
-    return "\n".join(pasos)
+    return 0
 
 
-def nombre_columna_normalizado(columna):
-    return (
-        str(columna)
-        .strip()
-        .lower()
-        .replace("á", "a")
-        .replace("é", "e")
-        .replace("í", "i")
-        .replace("ó", "o")
-        .replace("ú", "u")
+def obtener_tipo_columna_repositorio(columna):
+    col = normalizar_texto(columna)
+
+    if col == "lila":
+        return "Lila"
+
+    if "criticidad" in col:
+        return "Criticidad"
+
+    if "punto q" in col or col == "puntoq":
+        return "Punto Q"
+
+    if "estado equipo" in col or "estado del equipo" in col:
+        return "Estado Equipo"
+
+    if "frecuencia" in col:
+        return "Frecuencia"
+
+    if col == "turno":
+        return "Turno"
+
+    if col == "epp" or col == "e.p.p.":
+        return "Epp"
+
+    if "materiales" in col and "herramientas" in col:
+        return "Materiales/Herramientas"
+
+    if "descripcion actividad" in col:
+        return "Descripción Actividad"
+
+    return None
+
+
+def selector_con_repositorio(columna, serie, key_base):
+    tipo = obtener_tipo_columna_repositorio(columna)
+
+    if tipo not in REPOSITORIOS:
+        return None
+
+    opciones = REPOSITORIOS[tipo]
+    sugerido = valor_mas_repetido(serie)
+    index_sugerido = indice_opcion_sugerida(opciones, sugerido)
+
+    return st.selectbox(
+        f"Valor final para {columna}",
+        options=opciones,
+        index=index_sugerido,
+        key=key_base
     )
 
 
-def es_columna_descripcion_actividad(columna):
-    columna_norm = nombre_columna_normalizado(columna)
-    return "descripcion actividad" in columna_norm
+def descripcion_original_a_pasos(serie):
+    valores = limpiar_valores_serie(serie)
+    valores_unicos = list(dict.fromkeys(valores.tolist()))
+
+    if not valores_unicos:
+        return [""]
+
+    return valores_unicos
 
 
-def es_columna_epp(columna):
-    columna_norm = nombre_columna_normalizado(columna)
-    return columna_norm == "epp" or columna_norm == "e.p.p."
+def editor_descripcion_pasos(columna, serie, key_prefix):
+    pasos_sugeridos = descripcion_original_a_pasos(serie)
+
+    key_cantidad = f"{key_prefix}_cantidad_pasos"
+
+    if key_cantidad not in st.session_state:
+        st.session_state[key_cantidad] = max(len(pasos_sugeridos), 1)
+
+    col_btn_1, col_btn_2 = st.columns(2)
+
+    with col_btn_1:
+        if st.button("Agregar paso", key=f"{key_prefix}_agregar_paso"):
+            st.session_state[key_cantidad] += 1
+
+    with col_btn_2:
+        if st.button("Quitar paso", key=f"{key_prefix}_quitar_paso"):
+            if st.session_state[key_cantidad] > 1:
+                st.session_state[key_cantidad] -= 1
+
+    pasos_finales = []
+
+    for i in range(st.session_state[key_cantidad]):
+        valor_default = pasos_sugeridos[i] if i < len(pasos_sugeridos) else ""
+
+        paso = st.text_area(
+            f"Paso {i + 1}",
+            value=valor_default,
+            height=90,
+            key=f"{key_prefix}_paso_{i + 1}"
+        )
+
+        pasos_finales.append(f"Paso {i + 1}: {paso.strip()}")
+
+    return "\n".join(pasos_finales)
 
 
-def es_columna_materiales_herramientas(columna):
-    columna_norm = nombre_columna_normalizado(columna)
-    return (
-        "materiales" in columna_norm
-        and "herramientas" in columna_norm
+def editor_lista_dropdown(columna, opciones, serie, key_prefix):
+    valores_originales = limpiar_valores_serie(serie)
+    valores_unicos = list(dict.fromkeys(valores_originales.tolist()))
+
+    key_cantidad = f"{key_prefix}_cantidad"
+
+    if key_cantidad not in st.session_state:
+        st.session_state[key_cantidad] = max(len(valores_unicos), 1)
+
+    st.write(f"¿Cuántos elementos colocar en **{columna}**?")
+
+    col_btn_1, col_btn_2 = st.columns(2)
+
+    with col_btn_1:
+        if st.button("Agregar", key=f"{key_prefix}_agregar"):
+            st.session_state[key_cantidad] += 1
+
+    with col_btn_2:
+        if st.button("Quitar", key=f"{key_prefix}_quitar"):
+            if st.session_state[key_cantidad] > 1:
+                st.session_state[key_cantidad] -= 1
+
+    seleccionados = []
+
+    for i in range(st.session_state[key_cantidad]):
+        sugerido = valores_unicos[i] if i < len(valores_unicos) else ""
+        index_sugerido = indice_opcion_sugerida(opciones, sugerido)
+
+        valor = st.selectbox(
+            f"{columna} {i + 1}",
+            options=opciones,
+            index=index_sugerido,
+            key=f"{key_prefix}_{i + 1}"
+        )
+
+        seleccionados.append(valor)
+
+    seleccionados = list(dict.fromkeys(seleccionados))
+
+    return "\n".join([f"- {valor}" for valor in seleccionados])
+
+
+def selector_ids_con_checkboxes(ids_disponibles, key_prefix):
+    st.markdown("**Selecciona los IDs que quieres agrupar**")
+
+    buscar_id = st.text_input(
+        "Buscar ID",
+        key=f"{key_prefix}_buscar"
     )
+
+    if buscar_id:
+        ids_mostrar = [
+            id_valor for id_valor in ids_disponibles
+            if buscar_id.lower() in str(id_valor).lower()
+        ]
+    else:
+        ids_mostrar = ids_disponibles
+
+    col_btn_1, col_btn_2 = st.columns(2)
+
+    with col_btn_1:
+        if st.button("Seleccionar todos los IDs visibles", key=f"{key_prefix}_todos"):
+            for id_valor in ids_mostrar:
+                id_key = re.sub(r"[^A-Za-z0-9_]", "_", str(id_valor))
+                st.session_state[f"{key_prefix}_id_{id_key}"] = True
+
+    with col_btn_2:
+        if st.button("Deseleccionar todos los IDs visibles", key=f"{key_prefix}_ninguno"):
+            for id_valor in ids_mostrar:
+                id_key = re.sub(r"[^A-Za-z0-9_]", "_", str(id_valor))
+                st.session_state[f"{key_prefix}_id_{id_key}"] = False
+
+    ids_seleccionados = []
+
+    for id_valor in ids_mostrar:
+        id_key = re.sub(r"[^A-Za-z0-9_]", "_", str(id_valor))
+        checkbox_key = f"{key_prefix}_id_{id_key}"
+
+        if checkbox_key not in st.session_state:
+            st.session_state[checkbox_key] = False
+
+        marcado = st.checkbox(
+            str(id_valor),
+            key=checkbox_key
+        )
+
+        if marcado:
+            ids_seleccionados.append(str(id_valor))
+
+    return ids_seleccionados
 
 
 # =====================================================
@@ -1206,7 +1420,7 @@ if archivo is not None:
             st.write(
                 "Selecciona una máquina y uno o más IDs. "
                 "La app mostrará la información original de cada ID por columna. "
-                "Luego se autocompletará una propuesta editable para el nuevo ID agrupado."
+                "Luego se completará una propuesta usando repositorios de opciones."
             )
 
             if df_filtrado.empty:
@@ -1245,11 +1459,11 @@ if archivo is not None:
                     .tolist()
                 )
 
-                ids_seleccionados = st.multiselect(
-                    "Selecciona los IDs que quieres agrupar",
-                    options=ids_disponibles_agrupado,
-                    default=[]
-                )
+                with st.expander("Seleccionar IDs con checkboxes", expanded=True):
+                    ids_seleccionados = selector_ids_con_checkboxes(
+                        ids_disponibles=ids_disponibles_agrupado,
+                        key_prefix="ids_agrupado"
+                    )
 
                 if ids_seleccionados:
                     df_ids_seleccionados = df_maquina_agrupada[
@@ -1289,10 +1503,10 @@ if archivo is not None:
                     st.subheader("Completar información final del ID agrupado")
 
                     st.write(
-                        "Los campos se autocompletan con el valor más repetido entre los IDs seleccionados. "
-                        "Puedes modificar cualquier campo manualmente. "
-                        "En descripción de actividad se propone formato por pasos; "
-                        "en EPP y materiales/herramientas se propone formato de lista. "
+                        "Los campos se completan usando repositorios de opciones para evitar valores manuales. "
+                        "Lila, criticidad, punto Q, estado equipo, frecuencia y turno usan dropdown. "
+                        "Descripción actividad permite agregar o quitar pasos. "
+                        "EPP y materiales/herramientas permiten agregar o quitar elementos desde dropdowns. "
                         "En tiempo estimado se muestra la suma como ayuda."
                     )
 
@@ -1317,13 +1531,6 @@ if archivo is not None:
                         if col not in ["Id Estándar", "Maquina"]
                     ]
 
-                    columnas_text_area = [
-                        "Descripción Estándar Visual",
-                        "Descripción Actividad",
-                        "Epp",
-                        "Materiales/Herramientas"
-                    ]
-
                     for columna in columnas_editables:
                         st.markdown(f"### {columna}")
 
@@ -1337,6 +1544,8 @@ if archivo is not None:
                                 tabla_columna,
                                 use_container_width=True
                             )
+
+                        tipo_columna = obtener_tipo_columna_repositorio(columna)
 
                         if columna == "Tiempo Estimado (en Minutos)":
                             tiempos = pd.to_numeric(
@@ -1358,72 +1567,57 @@ if archivo is not None:
                                 key=f"final_{columna}"
                             )
 
-                        elif es_columna_descripcion_actividad(columna):
-                            valor_sugerido = descripcion_actividad_por_pasos(
-                                df_ids_seleccionados[columna]
-                            )
-
+                        elif tipo_columna == "Descripción Actividad":
                             st.caption(
-                                "Se autocompleta como pasos según los valores originales. "
-                                "Puedes modificarlo manualmente."
+                                "Agrega o quita pasos. Cada paso se redacta en una caja independiente."
                             )
 
-                            valores_finales[columna] = st.text_area(
-                                f"Valor final para {columna}",
-                                value=valor_sugerido,
-                                height=180,
-                                key=f"final_{columna}"
+                            valores_finales[columna] = editor_descripcion_pasos(
+                                columna=columna,
+                                serie=df_ids_seleccionados[columna],
+                                key_prefix=f"final_{columna}"
                             )
 
-                        elif es_columna_epp(columna):
-                            valor_sugerido = valores_unicos_como_lista(
-                                df_ids_seleccionados[columna]
-                            )
-
+                        elif tipo_columna == "Epp":
                             st.caption(
-                                "Se autocompleta como lista según los valores originales. "
-                                "Puedes modificarlo manualmente."
+                                "Selecciona los EPP desde el repositorio. No se ingresan valores manuales."
                             )
 
-                            valores_finales[columna] = st.text_area(
-                                f"Valor final para {columna}",
-                                value=valor_sugerido,
-                                height=160,
-                                key=f"final_{columna}"
+                            valores_finales[columna] = editor_lista_dropdown(
+                                columna=columna,
+                                opciones=REPOSITORIOS["Epp"],
+                                serie=df_ids_seleccionados[columna],
+                                key_prefix=f"final_{columna}"
                             )
 
-                        elif es_columna_materiales_herramientas(columna):
-                            valor_sugerido = valores_unicos_como_lista(
-                                df_ids_seleccionados[columna]
-                            )
-
+                        elif tipo_columna == "Materiales/Herramientas":
                             st.caption(
-                                "Se autocompleta como lista según los valores originales. "
-                                "Puedes modificarlo manualmente."
+                                "Selecciona materiales o herramientas desde el repositorio. No se ingresan valores manuales."
                             )
 
-                            valores_finales[columna] = st.text_area(
-                                f"Valor final para {columna}",
-                                value=valor_sugerido,
-                                height=160,
-                                key=f"final_{columna}"
+                            valores_finales[columna] = editor_lista_dropdown(
+                                columna=columna,
+                                opciones=REPOSITORIOS["Materiales/Herramientas"],
+                                serie=df_ids_seleccionados[columna],
+                                key_prefix=f"final_{columna}"
                             )
 
-                        elif columna in columnas_text_area:
-                            valor_sugerido = valor_mas_repetido(
-                                df_ids_seleccionados[columna]
-                            )
-
+                        elif tipo_columna in [
+                            "Lila",
+                            "Criticidad",
+                            "Punto Q",
+                            "Estado Equipo",
+                            "Frecuencia",
+                            "Turno"
+                        ]:
                             st.caption(
-                                "Se autocompleta con el valor más repetido. "
-                                "Puedes modificarlo manualmente."
+                                "Selecciona el valor desde el repositorio de opciones."
                             )
 
-                            valores_finales[columna] = st.text_area(
-                                f"Valor final para {columna}",
-                                value=valor_sugerido,
-                                height=120,
-                                key=f"final_{columna}"
+                            valores_finales[columna] = selector_con_repositorio(
+                                columna=columna,
+                                serie=df_ids_seleccionados[columna],
+                                key_base=f"final_{columna}"
                             )
 
                         else:
@@ -1432,8 +1626,7 @@ if archivo is not None:
                             )
 
                             st.caption(
-                                "Se autocompleta con el valor más repetido. "
-                                "Puedes modificarlo manualmente."
+                                "Campo sin repositorio definido. Se autocompleta con el valor más repetido."
                             )
 
                             valores_finales[columna] = st.text_input(
