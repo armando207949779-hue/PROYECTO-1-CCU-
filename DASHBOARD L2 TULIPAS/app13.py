@@ -823,22 +823,6 @@ def grafico_top_tulipas(df, top_n=15):
         tickfont=dict(size=11)
     )
 
-    # Destaca visualmente la tulipa más crítica.
-    top_1 = top.iloc[0]
-
-    fig.add_annotation(
-        x=top_1["Frecuencia"],
-        y=top_1["Etiqueta"],
-        text="Más crítica",
-        showarrow=True,
-        arrowhead=2,
-        ax=40,
-        ay=-25,
-        bgcolor="rgba(255,255,255,0.92)",
-        bordercolor="rgba(80,80,80,0.35)",
-        borderwidth=1,
-        font=dict(size=11, color="#b71c1c")
-    )
 
     return fig
 
