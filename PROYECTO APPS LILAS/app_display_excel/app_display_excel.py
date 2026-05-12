@@ -1123,7 +1123,7 @@ if archivo is not None:
 
                 st.divider()
 
-                with st.expander("Histograma", expanded=False):
+                with st.expander("Histograma", expanded=True):
                     columnas_numericas = df_filtrado.select_dtypes(
                         include=["number"]
                     ).columns.tolist()
