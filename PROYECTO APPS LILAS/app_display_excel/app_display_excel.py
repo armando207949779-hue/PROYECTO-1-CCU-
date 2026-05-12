@@ -831,7 +831,7 @@ if archivo is not None:
 
         usar_filtro_maquinas = st.sidebar.checkbox(
             "Filtrar por máquinas específicas",
-            value=False
+            value=True
         )
 
         if usar_filtro_maquinas:
@@ -1123,45 +1123,50 @@ if archivo is not None:
 
                 st.divider()
 
-                st.subheader("Histograma")
+                with st.expander("Histograma", expanded=False):
+                    columnas_numericas = df_filtrado.select_dtypes(
+                        include=["number"]
+                    ).columns.tolist()
 
-                columnas_numericas = df_filtrado.select_dtypes(
-                    include=["number"]
-                ).columns.tolist()
+                    if columnas_numericas:
+                        columna_histograma_default = (
+                            columnas_numericas.index("Tiempo Estimado (en Minutos)")
+                            if "Tiempo Estimado (en Minutos)" in columnas_numericas
+                            else 0
+                        )
 
-                if columnas_numericas:
-                    columna_histograma = st.selectbox(
-                        "Selecciona columna numérica para histograma",
-                        options=columnas_numericas,
-                        index=0
-                    )
+                        columna_histograma = st.selectbox(
+                            "Selecciona columna numérica para histograma",
+                            options=columnas_numericas,
+                            index=columna_histograma_default
+                        )
 
-                    bins = st.slider(
-                        "Cantidad de intervalos",
-                        min_value=5,
-                        max_value=50,
-                        value=15
-                    )
+                        bins = st.slider(
+                            "Cantidad de intervalos",
+                            min_value=5,
+                            max_value=50,
+                            value=15
+                        )
 
-                    fig_hist = px.histogram(
-                        df_filtrado,
-                        x=columna_histograma,
-                        nbins=bins,
-                        title=f"Histograma de {columna_histograma}"
-                    )
+                        fig_hist = px.histogram(
+                            df_filtrado,
+                            x=columna_histograma,
+                            nbins=bins,
+                            title=f"Histograma de {columna_histograma}"
+                        )
 
-                    fig_hist.update_layout(
-                        xaxis_title=columna_histograma,
-                        yaxis_title="Cantidad",
-                        bargap=0.05
-                    )
+                        fig_hist.update_layout(
+                            xaxis_title=columna_histograma,
+                            yaxis_title="Cantidad",
+                            bargap=0.05
+                        )
 
-                    st.plotly_chart(
-                        fig_hist,
-                        use_container_width=True
-                    )
-                else:
-                    st.info("No hay columnas numéricas disponibles para histograma.")
+                        st.plotly_chart(
+                            fig_hist,
+                            use_container_width=True
+                        )
+                    else:
+                        st.info("No hay columnas numéricas disponibles para histograma.")
 
                 st.divider()
 
@@ -1325,7 +1330,7 @@ if archivo is not None:
                     st.subheader("Comparación por columna")
 
                     for columna in df_ids_seleccionados.columns:
-                        with st.expander(f"Columna: {columna}", expanded=False):
+                        with st.expander(f"Columna: {columna}", expanded=True):
                             tabla_columna = tabla_valores_originales(
                                 df_ids_seleccionados,
                                 columna
@@ -1460,6 +1465,34 @@ if archivo is not None:
                                 key_base=f"final_{columna}"
                             )
 
+                            if tipo_columna == "Lila" and valores_finales[columna] == "LUBRICACIÓN":
+                                st.markdown("#### Datos de lubricación")
+
+                                tipo_lubricante_sugerido = ""
+                                cantidad_lubricante_sugerida = ""
+
+                                if "Tipo de Lubricante" in df_ids_seleccionados.columns:
+                                    tipo_lubricante_sugerido = valor_mas_repetido(
+                                        df_ids_seleccionados["Tipo de Lubricante"]
+                                    )
+
+                                if "Cantidad de Lubricante" in df_ids_seleccionados.columns:
+                                    cantidad_lubricante_sugerida = valor_mas_repetido(
+                                        df_ids_seleccionados["Cantidad de Lubricante"]
+                                    )
+
+                                valores_finales["Tipo de Lubricante"] = st.text_input(
+                                    "Tipo de lubricante",
+                                    value=tipo_lubricante_sugerido,
+                                    key="final_tipo_lubricante"
+                                )
+
+                                valores_finales["Cantidad de Lubricante"] = st.text_input(
+                                    "Cantidad de lubricante",
+                                    value=cantidad_lubricante_sugerida,
+                                    key="final_cantidad_lubricante"
+                                )
+
                         else:
                             valor_sugerido = valor_mas_repetido(
                                 df_ids_seleccionados[columna]
@@ -1486,7 +1519,14 @@ if archivo is not None:
                         if col in df_id_agrupado.columns
                     ]
 
-                    df_id_agrupado = df_id_agrupado[columnas_ordenadas]
+                    columnas_extra_agrupado = [
+                        col for col in df_id_agrupado.columns
+                        if col not in columnas_ordenadas
+                    ]
+
+                    df_id_agrupado = df_id_agrupado[
+                        columnas_ordenadas + columnas_extra_agrupado
+                    ]
                     df_id_agrupado = convertir_dataframe_a_mayusculas(df_id_agrupado)
 
                     st.dataframe(
