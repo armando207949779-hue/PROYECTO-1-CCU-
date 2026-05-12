@@ -1,6 +1,7 @@
 # App Streamlit: Registro mantenimiento válvulas KRONES Línea 11
 # Versión con logo, formato mejorado, margen corregido, operadores actualizados
 # resumen homologado a Línea 2 Válvulas y selector "Seleccione"
+# Actualización: 154 válvulas + alerta insumos críticos
 
 import streamlit as st
 import gspread
@@ -58,7 +59,8 @@ REPUESTOS = [
     "OTRO"
 ]
 
-NUMEROS_VALVULA = list(range(1, 153))
+# Línea 11 considera 154 válvulas
+NUMEROS_VALVULA = list(range(1, 155))
 
 
 # =====================================================
@@ -88,15 +90,16 @@ def inicializar_hoja(ws):
         "Número Válvula",
         "Repuesto / Mantención",
         "Observaciones",
+        "Alerta insumos críticos",
         "Fecha Registro",
         "Origen"
     ]
 
     try:
         if ws.row_values(1) != headers:
-            ws.update("A1:H1", [headers])
+            ws.update("A1:I1", [headers])
     except Exception:
-        ws.update("A1:H1", [headers])
+        ws.update("A1:I1", [headers])
 
 
 def obtener_fecha_registro():
@@ -219,6 +222,15 @@ st.markdown(
         padding-right: 18px;
         margin-top: 6px;
     }
+
+    .alerta-insumos {
+        background-color: rgba(255, 193, 7, 0.16);
+        color: #8A6D00;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-top: 12px;
+        font-size: 0.95rem;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -323,6 +335,21 @@ with st.container(border=True):
         placeholder="Escriba observaciones adicionales..."
     )
 
+    alerta_insumos_criticos = st.checkbox(
+        "Alerta insumos críticos",
+        help="Marcar cuando falte algún insumo crítico para realizar o completar la mantención."
+    )
+
+    if alerta_insumos_criticos:
+        st.markdown(
+            """
+            <div class="alerta-insumos">
+                Este registro quedará marcado con alerta por falta de insumos críticos.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
 
 # =====================================================
 # SELECCIÓN DE VÁLVULAS
@@ -330,7 +357,7 @@ with st.container(border=True):
 with st.container(border=True):
     st.subheader("Selección de válvulas")
 
-    st.caption("Seleccione una o más válvulas intervenidas. Línea 11 considera 152 válvulas.")
+    st.caption("Seleccione una o más válvulas intervenidas. Línea 11 considera 154 válvulas.")
 
     st.markdown(
         """
@@ -341,10 +368,10 @@ with st.container(border=True):
 
     columnas = 16
 
-    for inicio in range(1, 153, columnas):
+    for inicio in range(1, 155, columnas):
         cols = st.columns(columnas, gap="small")
 
-        for i, num in enumerate(range(inicio, min(inicio + columnas, 153))):
+        for i, num in enumerate(range(inicio, min(inicio + columnas, 155))):
             with cols[i]:
                 st.checkbox(str(num), key=f"val_{num}")
 
@@ -384,6 +411,10 @@ with st.container(border=True):
     with col2:
         st.write("Repuesto / Mantención:", repuesto_final)
         st.write("Válvulas seleccionadas:", valvulas)
+        st.write(
+            "Alerta insumos críticos:",
+            "Sí" if alerta_insumos_criticos else "No"
+        )
 
     if observaciones:
         st.write("Observaciones:", observaciones)
@@ -434,6 +465,7 @@ if guardar:
                 v,
                 repuesto_final,
                 observaciones,
+                "Sí" if alerta_insumos_criticos else "No",
                 fecha_reg,
                 "Streamlit - Línea 11"
             ])
@@ -453,7 +485,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Válvulas KRONES Línea 11</b> · v1.4<br>
+        <b>Formulario Mantenimiento Válvulas KRONES Línea 11</b> · v1.5<br>
         Streamlit · Google Sheets
     </div>
     """,
