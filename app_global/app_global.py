@@ -231,6 +231,24 @@ def detectar_columna_operador(df):
     return None
 
 
+def detectar_columna_detalle_alerta(df):
+    posibles = [
+        "Detalle alerta insumo crítico",
+        "Detalle alerta insumo critico",
+        "DETALLE ALERTA INSUMO CRÍTICO",
+        "DETALLE ALERTA INSUMO CRITICO",
+        "Detalle alerta",
+        "detalle alerta",
+        "Detalle Alerta",
+    ]
+
+    for col in posibles:
+        if col in df.columns:
+            return col
+
+    return None
+
+
 def calcular_estado_dashboard(nombre, config, umbral_dias):
     df, error = cargar_sheet_alerta(config["sheet_id"])
 
@@ -245,6 +263,7 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
             "Días sin registro": None,
             "Umbral": umbral_dias,
             "Registros": 0,
+            "Detalle alerta insumo crítico": "No disponible",
             "Detalle": f"No se pudo leer Google Sheets: {error}",
         }
 
@@ -259,11 +278,13 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
             "Días sin registro": None,
             "Umbral": umbral_dias,
             "Registros": 0,
+            "Detalle alerta insumo crítico": "No disponible",
             "Detalle": "La hoja está vacía o no contiene registros válidos.",
         }
 
     columna_fecha = detectar_columna_fecha(df)
     columna_operador = detectar_columna_operador(df)
+    columna_detalle_alerta = detectar_columna_detalle_alerta(df)
 
     if columna_fecha is None:
         return {
@@ -276,6 +297,7 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
             "Días sin registro": None,
             "Umbral": umbral_dias,
             "Registros": len(df),
+            "Detalle alerta insumo crítico": "No disponible",
             "Detalle": "No se encontró columna Fecha o Fecha registro.",
         }
 
@@ -300,6 +322,7 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
             "Días sin registro": None,
             "Umbral": umbral_dias,
             "Registros": len(df),
+            "Detalle alerta insumo crítico": "No disponible",
             "Detalle": f"La columna {columna_fecha} no contiene fechas válidas.",
         }
 
@@ -314,12 +337,24 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
     else:
         ultimo_operador = "No disponible"
 
-    hoy = pd.Timestamp(date.today())
-    dias_sin_registro = int((hoy.normalize() - ultima_fecha.normalize()).days)
+    if columna_detalle_alerta is not None:
+        detalle_alerta_insumo = str(ultimo[columna_detalle_alerta]).strip()
 
-    if dias_sin_registro < 0:
+        if detalle_alerta_insumo.upper() in ["", "NAN", "NONE", "NAT"]:
+            detalle_alerta_insumo = "Sin detalle"
+    else:
+        detalle_alerta_insumo = "No disponible"
+
+    hoy = pd.Timestamp(date.today())
+
+    dias_calculados = int((hoy.normalize() - ultima_fecha.normalize()).days)
+
+    # Evita mostrar días negativos cuando la fecha del registro viene futura
+    dias_sin_registro = max(dias_calculados, 0)
+
+    if dias_calculados < 0:
         estado = "OK"
-        detalle = "Último registro tiene fecha futura o igual a hoy."
+        detalle = "Último registro vigente. Días sin registro ajustado a 0."
     elif dias_sin_registro > umbral_dias:
         estado = "ALERTA"
         detalle = f"Han pasado {dias_sin_registro} días desde el último registro."
@@ -337,6 +372,7 @@ def calcular_estado_dashboard(nombre, config, umbral_dias):
         "Días sin registro": dias_sin_registro,
         "Umbral": umbral_dias,
         "Registros": len(df),
+        "Detalle alerta insumo crítico": detalle_alerta_insumo,
         "Detalle": detalle,
     }
 
@@ -480,7 +516,8 @@ def pagina_alertas():
         if pd.isna(mayor_dias):
             mayor_dias_txt = "N/A"
         else:
-            mayor_dias_txt = int(mayor_dias)
+            # Ya viene ajustado para no ser negativo
+            mayor_dias_txt = max(int(mayor_dias), 0)
 
         if df_con_problema.empty:
             origen_alerta = "Sin alertas"
@@ -534,7 +571,7 @@ def pagina_alertas():
         df_detalle = df_alertas.copy()
 
         df_detalle["Días sin registro"] = df_detalle["Días sin registro"].apply(
-            lambda x: "N/A" if pd.isna(x) else int(x)
+            lambda x: "N/A" if pd.isna(x) else max(int(x), 0)
         )
 
         columnas_detalle = [
@@ -546,6 +583,7 @@ def pagina_alertas():
             "Días sin registro",
             "Umbral",
             "Registros",
+            "Detalle alerta insumo crítico",
             "Detalle",
         ]
 
