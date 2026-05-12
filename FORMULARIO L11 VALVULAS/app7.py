@@ -1,7 +1,7 @@
 # App Streamlit: Registro mantenimiento válvulas KRONES Línea 11
 # Versión con logo, formato mejorado, margen corregido, operadores actualizados
 # resumen homologado a Línea 2 Válvulas y selector "Seleccione"
-# Actualización: 154 válvulas + alerta insumos críticos
+# Actualización: 154 válvulas + alerta insumos críticos con detalle
 
 import streamlit as st
 import gspread
@@ -91,15 +91,16 @@ def inicializar_hoja(ws):
         "Repuesto / Mantención",
         "Observaciones",
         "Alerta insumos críticos",
+        "Detalle alerta insumo crítico",
         "Fecha Registro",
         "Origen"
     ]
 
     try:
         if ws.row_values(1) != headers:
-            ws.update("A1:I1", [headers])
+            ws.update("A1:J1", [headers])
     except Exception:
-        ws.update("A1:I1", [headers])
+        ws.update("A1:J1", [headers])
 
 
 def obtener_fecha_registro():
@@ -335,20 +336,44 @@ with st.container(border=True):
         placeholder="Escriba observaciones adicionales..."
     )
 
-    alerta_insumos_criticos = st.checkbox(
-        "Alerta insumos críticos",
-        help="Marcar cuando falte algún insumo crítico para realizar o completar la mantención."
-    )
 
-    if alerta_insumos_criticos:
+# =====================================================
+# ALERTA INSUMOS CRÍTICOS
+# =====================================================
+with st.container(border=True):
+    st.subheader("Alerta insumos críticos")
+
+    col_si, col_no = st.columns(2)
+
+    with col_si:
+        alerta_si = st.checkbox("Sí", key="alerta_insumos_si")
+
+    with col_no:
+        alerta_no = st.checkbox("No", key="alerta_insumos_no")
+
+    # Evita que queden ambas opciones activas al mismo tiempo
+    if alerta_si and alerta_no:
+        st.warning("Seleccione solo una opción: Sí o No.")
+
+    alerta_insumos_criticos = "Sí" if alerta_si and not alerta_no else "No"
+
+    detalle_alerta_insumo = ""
+
+    if alerta_si and not alerta_no:
         st.markdown(
             """
             <div class="alerta-insumos">
-                Este registro quedará marcado con alerta por falta de insumos críticos.
+                Indique cuál es el insumo crítico faltante o la alerta detectada.
             </div>
             """,
             unsafe_allow_html=True
         )
+
+        detalle_alerta_insumo = st.text_area(
+            "Detalle alerta insumo crítico",
+            height=100,
+            placeholder="Ejemplo: Falta stock de O-RINGS, resorte específico, bloque, kit de reparación, etc."
+        ).upper().strip()
 
 
 # =====================================================
@@ -411,13 +436,13 @@ with st.container(border=True):
     with col2:
         st.write("Repuesto / Mantención:", repuesto_final)
         st.write("Válvulas seleccionadas:", valvulas)
-        st.write(
-            "Alerta insumos críticos:",
-            "Sí" if alerta_insumos_criticos else "No"
-        )
+        st.write("Alerta insumos críticos:", alerta_insumos_criticos)
 
     if observaciones:
         st.write("Observaciones:", observaciones)
+
+    if alerta_insumos_criticos == "Sí":
+        st.write("Detalle alerta insumo crítico:", detalle_alerta_insumo if detalle_alerta_insumo else "-")
 
     guardar = st.button("Guardar registro", use_container_width=True)
 
@@ -447,6 +472,15 @@ if guardar:
     if repuesto_sel == "OTRO" and not otro_repuesto:
         errores.append("Especificar el repuesto / mantención en OTRO")
 
+    if alerta_si and alerta_no:
+        errores.append("Seleccionar solo una opción en alerta insumos críticos: Sí o No")
+
+    if not alerta_si and not alerta_no:
+        errores.append("Seleccionar Sí o No en alerta insumos críticos")
+
+    if alerta_si and not detalle_alerta_insumo:
+        errores.append("Indicar cuál es la alerta de insumo crítico")
+
     if errores:
         st.warning("Faltan campos obligatorios:")
 
@@ -465,7 +499,8 @@ if guardar:
                 v,
                 repuesto_final,
                 observaciones,
-                "Sí" if alerta_insumos_criticos else "No",
+                alerta_insumos_criticos,
+                detalle_alerta_insumo,
                 fecha_reg,
                 "Streamlit - Línea 11"
             ])
@@ -485,7 +520,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Válvulas KRONES Línea 11</b> · v1.5<br>
+        <b>Formulario Mantenimiento Válvulas KRONES Línea 11</b> · v1.6<br>
         Streamlit · Google Sheets
     </div>
     """,
