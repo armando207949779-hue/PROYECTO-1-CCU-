@@ -1,7 +1,7 @@
 # App Streamlit: Registro mantenimiento válvulas KRONES Línea 11
 # Versión con logo, formato mejorado, margen corregido, operadores actualizados
 # resumen homologado a Línea 2 Válvulas y selector "Seleccione"
-# Actualización: 154 válvulas + alerta insumos críticos con detalle
+# Actualización: 154 válvulas + alerta insumos críticos con detalle + SONDA
 
 import streamlit as st
 import gspread
@@ -47,6 +47,7 @@ OPERADORES = [
     "",
     "GUSTAVO ADOLFO MORÓN AGUILERA",
     "JAVIER FLORES LLANCANAO",
+    "MARCO QUILAHUEQUE CONTRERAS",
     "NEFTALI RUBINOT ALARCON",
     "OTRO"
 ]
@@ -56,6 +57,7 @@ REPUESTOS = [
     "O-RINGS",
     "RESORTE",
     "ON/OFF",
+    "SONDA",
     "OTRO"
 ]
 
@@ -286,6 +288,23 @@ def mostrar_logo():
 
 
 # =====================================================
+# FUNCIONES ALERTA INSUMOS CRÍTICOS
+# =====================================================
+def seleccionar_alerta_si():
+    if st.session_state.get("alerta_insumos_si", False):
+        st.session_state["alerta_insumos_no"] = False
+    elif not st.session_state.get("alerta_insumos_no", False):
+        st.session_state["alerta_insumos_no"] = True
+
+
+def seleccionar_alerta_no():
+    if st.session_state.get("alerta_insumos_no", False):
+        st.session_state["alerta_insumos_si"] = False
+    elif not st.session_state.get("alerta_insumos_si", False):
+        st.session_state["alerta_insumos_no"] = True
+
+
+# =====================================================
 # ENCABEZADO
 # =====================================================
 mostrar_logo()
@@ -388,20 +407,24 @@ with st.container(border=True):
     col_si, col_no, col_espacio = st.columns([1, 1, 4])
 
     with col_si:
-        alerta_si = st.checkbox("Sí", key="alerta_insumos_si")
+        alerta_si = st.checkbox(
+            "Sí",
+            key="alerta_insumos_si",
+            on_change=seleccionar_alerta_si
+        )
 
     with col_no:
-        alerta_no = st.checkbox("No", key="alerta_insumos_no")
+        alerta_no = st.checkbox(
+            "No",
+            key="alerta_insumos_no",
+            on_change=seleccionar_alerta_no
+        )
 
-    # Evita que queden ambas opciones activas al mismo tiempo
-    if alerta_si and alerta_no:
-        st.warning("Seleccione solo una opción: Sí o No.")
-
-    alerta_insumos_criticos = "Sí" if alerta_si and not alerta_no else "No"
+    alerta_insumos_criticos = "Sí" if alerta_si else "No"
 
     detalle_alerta_insumo = ""
 
-    if alerta_si and not alerta_no:
+    if alerta_si:
         st.markdown(
             """
             <div class="alerta-box">
@@ -419,7 +442,7 @@ with st.container(border=True):
         detalle_alerta_insumo = st.text_area(
             "Detalle alerta insumo crítico",
             height=90,
-            placeholder="Ejemplo: Falta stock de O-RINGS, resorte específico, bloque, kit de reparación, etc.",
+            placeholder="Ejemplo: Falta stock de O-RINGS, resorte específico, bloque, kit de reparación, sonda, etc.",
             label_visibility="collapsed"
         ).upper().strip()
 
@@ -523,12 +546,6 @@ if guardar:
     if repuesto_sel == "OTRO" and not otro_repuesto:
         errores.append("Especificar el repuesto / mantención en OTRO")
 
-    if alerta_si and alerta_no:
-        errores.append("Seleccionar solo una opción en alerta insumos críticos: Sí o No")
-
-    if not alerta_si and not alerta_no:
-        errores.append("Seleccionar Sí o No en alerta insumos críticos")
-
     if alerta_si and not detalle_alerta_insumo:
         errores.append("Indicar cuál es la alerta de insumo crítico")
 
@@ -571,7 +588,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Válvulas KRONES Línea 11</b> · v1.6<br>
+        <b>Formulario Mantenimiento Válvulas KRONES Línea 11</b> · v1.7<br>
         Streamlit · Google Sheets
     </div>
     """,
