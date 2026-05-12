@@ -136,6 +136,82 @@ st.markdown(
         opacity: 0.75;
         margin-top: 0.3rem;
     }
+
+    .estado-ok {
+        background: linear-gradient(90deg, rgba(46, 204, 113, 0.16), rgba(232, 248, 239, 0.95));
+        border-left: 7px solid #27AE60;
+        border-radius: 12px;
+        padding: 16px 18px;
+        margin-top: 12px;
+        margin-bottom: 18px;
+    }
+
+    .estado-ok-title {
+        color: #145A32;
+        font-size: 1.1rem;
+        font-weight: 800;
+        margin-bottom: 4px;
+    }
+
+    .estado-ok-text {
+        color: #196F3D;
+        font-size: 0.95rem;
+    }
+
+    .estado-alerta {
+        background: linear-gradient(90deg, rgba(231, 76, 60, 0.16), rgba(253, 237, 236, 0.95));
+        border-left: 7px solid #E74C3C;
+        border-radius: 12px;
+        padding: 16px 18px;
+        margin-top: 12px;
+        margin-bottom: 18px;
+    }
+
+    .estado-alerta-title {
+        color: #922B21;
+        font-size: 1.1rem;
+        font-weight: 800;
+        margin-bottom: 4px;
+    }
+
+    .estado-alerta-text {
+        color: #943126;
+        font-size: 0.95rem;
+    }
+
+    .kpi-ok {
+        background-color: rgba(46, 204, 113, 0.12);
+        border: 1px solid rgba(39, 174, 96, 0.35);
+        border-radius: 12px;
+        padding: 14px 16px;
+        text-align: center;
+    }
+
+    .kpi-alerta {
+        background-color: rgba(231, 76, 60, 0.12);
+        border: 1px solid rgba(192, 57, 43, 0.35);
+        border-radius: 12px;
+        padding: 14px 16px;
+        text-align: center;
+    }
+
+    .kpi-title {
+        font-size: 0.88rem;
+        opacity: 0.8;
+        margin-bottom: 4px;
+    }
+
+    .kpi-value-ok {
+        font-size: 1.8rem;
+        color: #145A32;
+        font-weight: 800;
+    }
+
+    .kpi-value-alerta {
+        font-size: 1.8rem;
+        color: #922B21;
+        font-weight: 800;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -165,6 +241,56 @@ def mostrar_logo_centrado():
         )
     else:
         st.warning(f"Logo no encontrado: {LOGO_PATH}")
+
+
+# =====================================================
+# ESTILO TABLAS ALERTAS
+# =====================================================
+
+def estilo_resumen_alertas(row):
+    estado = str(row.get("Estado", "")).upper()
+    existe_alerta = str(row.get("¿Existe alerta?", "")).upper()
+
+    if estado in ["ALERTA", "ERROR"] or existe_alerta == "SÍ":
+        return [
+            "background-color: #FDEDEC; color: #922B21; font-weight: 700;"
+            for _ in row
+        ]
+
+    return [
+        "background-color: #EAFAF1; color: #145A32; font-weight: 700;"
+        for _ in row
+    ]
+
+
+def estilo_detalle_alertas(row):
+    estado = str(row.get("Estado", "")).upper()
+
+    if estado in ["ALERTA", "ERROR"]:
+        return [
+            "background-color: #FDEDEC; color: #922B21; font-weight: 700;"
+            for _ in row
+        ]
+
+    return [
+        "background-color: #EAFAF1; color: #145A32;"
+        for _ in row
+    ]
+
+
+def tarjeta_estado(titulo, valor, alerta=False):
+    clase = "kpi-alerta" if alerta else "kpi-ok"
+    clase_valor = "kpi-value-alerta" if alerta else "kpi-value-ok"
+
+    st.markdown(
+        f"""
+        <div class="{clase}">
+            <div class="kpi-title">{titulo}</div>
+            <div class="{clase_valor}">{valor}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 # =====================================================
@@ -516,7 +642,6 @@ def pagina_alertas():
         if pd.isna(mayor_dias):
             mayor_dias_txt = "N/A"
         else:
-            # Ya viene ajustado para no ser negativo
             mayor_dias_txt = max(int(mayor_dias), 0)
 
         if df_con_problema.empty:
@@ -550,20 +675,53 @@ def pagina_alertas():
         .reset_index(drop=True)
     )
 
+    total_lineas_con_alerta = int((df_resumen["¿Existe alerta?"] == "Sí").sum())
+    total_lineas_ok = int((df_resumen["¿Existe alerta?"] == "No").sum())
+
+    col_ok, col_alerta = st.columns(2)
+
+    with col_ok:
+        tarjeta_estado("Líneas sin alerta", total_lineas_ok, alerta=False)
+
+    with col_alerta:
+        tarjeta_estado("Líneas con alerta/error", total_lineas_con_alerta, alerta=total_lineas_con_alerta > 0)
+
+    if total_lineas_con_alerta > 0:
+        st.markdown(
+            f"""
+            <div class="estado-alerta">
+                <div class="estado-alerta-title">
+                    Alerta activa
+                </div>
+                <div class="estado-alerta-text">
+                    Hay alertas o errores activos en {total_lineas_con_alerta} línea(s).
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            """
+            <div class="estado-ok">
+                <div class="estado-ok-title">
+                    Estado operacional OK
+                </div>
+                <div class="estado-ok-text">
+                    No existen alertas activas en ninguna línea.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
     st.markdown("## Resumen por línea")
 
     st.dataframe(
-        df_resumen,
+        df_resumen.style.apply(estilo_resumen_alertas, axis=1),
         use_container_width=True,
         hide_index=True
     )
-
-    total_lineas_con_alerta = int((df_resumen["¿Existe alerta?"] == "Sí").sum())
-
-    if total_lineas_con_alerta > 0:
-        st.error(f"Hay alertas o errores activos en {total_lineas_con_alerta} línea(s).")
-    else:
-        st.success("No existen alertas activas en ninguna línea.")
 
     st.markdown("---")
 
@@ -588,7 +746,7 @@ def pagina_alertas():
         ]
 
         st.dataframe(
-            df_detalle[columnas_detalle],
+            df_detalle[columnas_detalle].style.apply(estilo_detalle_alertas, axis=1),
             use_container_width=True,
             hide_index=True
         )
