@@ -2,6 +2,7 @@
 Dashboard de Mantenimiento de Válvulas Krones - Línea 11
 Conectado al formulario Streamlit y Google Sheets.
 Dashboard Área de Operaciones - Análisis de válvulas Krones.
+Actualización: 154 válvulas + SONDA + alerta insumos críticos.
 """
 
 import streamlit as st
@@ -42,20 +43,23 @@ LOGO_PATH = next(
 SHEET_ID = "1ompaiCPCIegzgj80wHjPde5GL14660AUBnUTt6iTD_w"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
-VALVULAS_TODAS = list(range(1, 153))
+# Línea 11 actualizada a 154 válvulas
+VALVULAS_TODAS = list(range(1, 155))
 
 TIPOS_MANTENCION = [
     "BLOQUE",
     "O-RINGS",
     "RESORTE",
     "ON/OFF",
+    "SONDA",
     "OTRO"
 ]
 
 OPERADORES_ESPERADOS = [
-    "GUSTAVO MORÓN",
-    "JAVIER FLORES",
-    "NEFTALI RUBINOT"
+    "GUSTAVO ADOLFO MORÓN AGUILERA",
+    "JAVIER FLORES LLANCANAO",
+    "MARCO QUILAHUEQUE CONTRERAS",
+    "NEFTALI RUBINOT ALARCON"
 ]
 
 COLORS_REPUESTO = {
@@ -63,7 +67,9 @@ COLORS_REPUESTO = {
     "O-RINGS": "#e74c3c",
     "RESORTE": "#2ecc71",
     "ON/OFF": "#f39c12",
-    "OTRO": "#9b59b6"
+    "SONDA": "#16a085",
+    "OTRO": "#9b59b6",
+    "SIN MANTENCIÓN": "#95a5a6"
 }
 
 GRID = "rgba(128,128,128,0.15)"
@@ -90,6 +96,27 @@ st.markdown(
     h2 {
         border-bottom: 2px solid #3498db;
         padding-bottom: 0.4rem;
+    }
+
+    .alerta-panel {
+        background: linear-gradient(90deg, rgba(255, 193, 7, 0.16), rgba(255, 248, 220, 0.72));
+        border-left: 6px solid #F4B400;
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-top: 8px;
+        margin-bottom: 16px;
+    }
+
+    .alerta-panel-title {
+        color: #8A6D00;
+        font-size: 1rem;
+        font-weight: 800;
+        margin-bottom: 4px;
+    }
+
+    .alerta-panel-text {
+        color: #6E5A00;
+        font-size: 0.92rem;
     }
     </style>
     """,
@@ -263,7 +290,9 @@ def crear_dataframe_vacio():
         "Operador",
         "Válvula",
         "Mantención",
-        "Observaciones"
+        "Observaciones",
+        "Alerta insumos críticos",
+        "Detalle alerta insumo crítico"
     ]
 
     return pd.DataFrame(columns=columnas)
@@ -292,7 +321,12 @@ def cargar_datos():
         "Repuesto / Mantención": "Mantención",
         "Repuesto / Mantencion": "Mantención",
         "Fecha Registro": "Fecha registro",
-        "Fecha registro": "Fecha registro"
+        "Fecha registro": "Fecha registro",
+        "Alerta Insumos Críticos": "Alerta insumos críticos",
+        "Alerta insumos criticos": "Alerta insumos críticos",
+        "Alerta insumos críticos": "Alerta insumos críticos",
+        "Detalle alerta insumo critico": "Detalle alerta insumo crítico",
+        "Detalle alerta insumo crítico": "Detalle alerta insumo crítico"
     }
 
     df = df.rename(columns={c: rename_cols[c] for c in df.columns if c in rename_cols})
@@ -311,6 +345,12 @@ def cargar_datos():
     if faltantes:
         raise ValueError(f"Faltan columnas requeridas en Google Sheets: {faltantes}")
 
+    if "Alerta insumos críticos" not in df.columns:
+        df["Alerta insumos críticos"] = "No"
+
+    if "Detalle alerta insumo crítico" not in df.columns:
+        df["Detalle alerta insumo crítico"] = ""
+
     df["Fecha"] = pd.to_datetime(df["Fecha"], dayfirst=True, errors="coerce")
     df["Válvula"] = pd.to_numeric(df["Válvula"], errors="coerce")
 
@@ -323,10 +363,48 @@ def cargar_datos():
     df["Mantención"] = df["Mantención"].fillna("").astype(str).str.strip().str.upper()
     df["Observaciones"] = df["Observaciones"].fillna("").astype(str).str.strip()
 
+    df["Alerta insumos críticos"] = (
+        df["Alerta insumos críticos"]
+        .fillna("No")
+        .astype(str)
+        .str.strip()
+        .str.capitalize()
+    )
+
+    df["Alerta insumos críticos"] = df["Alerta insumos críticos"].replace({
+        "Si": "Sí",
+        "SI": "Sí",
+        "SÍ": "Sí",
+        "TRUE": "Sí",
+        "True": "Sí",
+        "1": "Sí",
+        "NO": "No",
+        "False": "No",
+        "FALSE": "No",
+        "0": "No",
+        "": "No"
+    })
+
+    df["Detalle alerta insumo crítico"] = (
+        df["Detalle alerta insumo crítico"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
     df = df.dropna(subset=["Fecha", "Válvula"]).copy()
 
     if df.empty:
-        columnas_finales = columnas_necesarias.copy()
+        columnas_finales = [
+            "Fecha",
+            "Turno",
+            "Operador",
+            "Válvula",
+            "Mantención",
+            "Observaciones",
+            "Alerta insumos críticos",
+            "Detalle alerta insumo crítico"
+        ]
 
         if "Fecha registro" in df.columns:
             columnas_finales.append("Fecha registro")
@@ -338,7 +416,8 @@ def cargar_datos():
 
     df["Válvula"] = df["Válvula"].astype(int)
 
-    df = df[df["Válvula"].between(1, 152)].copy()
+    # Actualizado: válvulas 1 a 154
+    df = df[df["Válvula"].between(1, 154)].copy()
 
     columnas_finales = [
         "Fecha",
@@ -346,7 +425,9 @@ def cargar_datos():
         "Operador",
         "Válvula",
         "Mantención",
-        "Observaciones"
+        "Observaciones",
+        "Alerta insumos críticos",
+        "Detalle alerta insumo crítico"
     ]
 
     if "Fecha registro" in df.columns:
@@ -588,6 +669,48 @@ def grafico_por_mantencion(df):
     return fig
 
 
+def grafico_alertas_insumos(df):
+    if df.empty or "Alerta insumos críticos" not in df.columns:
+        return fig_sin_datos()
+
+    alertas = (
+        df["Alerta insumos críticos"]
+        .fillna("No")
+        .replace("", "No")
+        .value_counts()
+        .reindex(["Sí", "No"], fill_value=0)
+        .reset_index()
+    )
+
+    alertas.columns = ["Alerta", "Cantidad"]
+
+    colores = ["#f39c12" if a == "Sí" else "#2ecc71" for a in alertas["Alerta"]]
+
+    fig = go.Figure(data=[go.Bar(
+        x=alertas["Alerta"],
+        y=alertas["Cantidad"],
+        marker=dict(color=colores),
+        text=alertas["Cantidad"],
+        textposition="outside",
+        cliponaxis=False,
+        hovertemplate="<b>Alerta: %{x}</b><br>Registros: %{y}<extra></extra>"
+    )])
+
+    aplicar_estilo_figura(fig, "Alertas de insumos críticos", 360, t=90, b=90)
+
+    fig.update_layout(
+        xaxis_title="Alerta insumos críticos",
+        yaxis_title="Registros",
+        showlegend=False,
+        margin=dict(l=70, r=90, t=90, b=90)
+    )
+
+    max_y = alertas["Cantidad"].max() if not alertas.empty else 1
+    fig.update_yaxes(range=[0, max_y * 1.25 if max_y > 0 else 1])
+
+    return fig
+
+
 def grafico_estado_valvulas(df):
     if df.empty or "Válvula" not in df.columns:
         conteos = pd.Series(0, index=VALVULAS_TODAS)
@@ -734,6 +857,7 @@ def grafico_estado_valvulas(df):
 
     return fig
 
+
 def grafico_valvula_mantencion_burbujas(df):
     if df.empty:
         return fig_sin_datos()
@@ -775,8 +899,9 @@ def grafico_valvula_mantencion_burbujas(df):
         margin=dict(l=70, r=90, t=90, b=85)
     )
 
-    return fig
+    fig.update_xaxes(range=[0, 155])
 
+    return fig
 
 
 # =====================================================
@@ -906,6 +1031,12 @@ mantencion_opciones = (
     else []
 )
 
+alerta_opciones = (
+    sorted(df["Alerta insumos críticos"].dropna().unique())
+    if "Alerta insumos críticos" in df.columns and not df.empty
+    else ["No", "Sí"]
+)
+
 turnos_sel = st.sidebar.multiselect(
     "Turnos",
     turnos_opciones,
@@ -924,6 +1055,12 @@ mantencion_sel = st.sidebar.multiselect(
     default=mantencion_opciones
 )
 
+alerta_sel = st.sidebar.multiselect(
+    "Alerta insumos críticos",
+    alerta_opciones,
+    default=alerta_opciones
+)
+
 valvulas_sel = st.sidebar.multiselect(
     "Válvulas",
     VALVULAS_TODAS,
@@ -937,7 +1074,6 @@ mostrar_estado_global = st.sidebar.checkbox(
     "Estado global de válvulas",
     value=True
 )
-
 
 mostrar_tendencia = st.sidebar.checkbox(
     "Tendencia temporal",
@@ -956,6 +1092,11 @@ mostrar_operador = st.sidebar.checkbox(
 
 mostrar_mantencion = st.sidebar.checkbox(
     "Tipos de mantención",
+    value=True
+)
+
+mostrar_alertas = st.sidebar.checkbox(
+    "Alertas insumos críticos",
     value=True
 )
 
@@ -981,6 +1122,7 @@ else:
         (df["Turno"].isin(turnos_sel)) &
         (operadores_base.isin(operadores_sel)) &
         (df["Mantención"].isin(mantencion_sel)) &
+        (df["Alerta insumos críticos"].isin(alerta_sel)) &
         (df["Válvula"].isin(valvulas_sel))
     ].copy()
 
@@ -1011,6 +1153,12 @@ valvulas_intervenidas = (
 )
 promedio_registros_dia = len(df_f) / max(dias_con_registros, 1)
 
+alertas_criticas = (
+    int((df_f["Alerta insumos críticos"] == "Sí").sum())
+    if "Alerta insumos críticos" in df_f.columns and not df_f.empty
+    else 0
+)
+
 kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
 
 with kpi1:
@@ -1028,7 +1176,7 @@ with kpi4:
 with kpi5:
     tarjeta_kpi("Registros por día", f"{promedio_registros_dia:.1f}")
 
-kpi6, kpi7 = st.columns(2)
+kpi6, kpi7, kpi8 = st.columns(3)
 
 with kpi6:
     tarjeta_kpi(
@@ -1045,9 +1193,17 @@ with kpi7:
         alerta=True
     )
 
-kpi8, kpi9 = st.columns(2)
-
 with kpi8:
+    tarjeta_kpi(
+        "Alertas insumos críticos",
+        alertas_criticas,
+        "Registros marcados con alerta" if alertas_criticas > 0 else "Sin alertas en el filtro actual",
+        alerta=alertas_criticas > 0
+    )
+
+kpi9, kpi10 = st.columns(2)
+
+with kpi9:
     valvulas_sin_registro = len(set(valvulas_sel)) - valvulas_intervenidas
 
     tarjeta_kpi(
@@ -1056,7 +1212,7 @@ with kpi8:
         "Dentro del rango filtrado"
     )
 
-with kpi9:
+with kpi10:
     if cantidad_menos_registros == 0:
         tarjeta_kpi(
             "Operador con menos registros",
@@ -1070,6 +1226,28 @@ with kpi9:
             operador_menos_registros,
             f"{cantidad_menos_registros} registros"
         )
+
+# Panel de alertas activas
+df_alertas = (
+    df_f[df_f["Alerta insumos críticos"] == "Sí"].copy()
+    if "Alerta insumos críticos" in df_f.columns and not df_f.empty
+    else pd.DataFrame()
+)
+
+if not df_alertas.empty:
+    st.markdown(
+        f"""
+        <div class="alerta-panel">
+            <div class="alerta-panel-title">
+                Alertas de insumos críticos activas
+            </div>
+            <div class="alerta-panel-text">
+                Hay {len(df_alertas)} registro(s) con alerta de insumos críticos dentro de los filtros seleccionados.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 st.markdown("---")
 
@@ -1106,7 +1284,6 @@ else:
 
         st.markdown("---")
 
-
     if mostrar_tendencia:
         st.markdown("## Tendencia temporal")
 
@@ -1120,7 +1297,8 @@ else:
     graficos_generales = [
         mostrar_turno,
         mostrar_operador,
-        mostrar_mantencion
+        mostrar_mantencion,
+        mostrar_alertas
     ]
 
     if any(graficos_generales):
@@ -1144,6 +1322,12 @@ else:
                 use_container_width=True
             )
 
+        if mostrar_alertas:
+            st.plotly_chart(
+                grafico_alertas_insumos(df_f),
+                use_container_width=True
+            )
+
         st.markdown("---")
 
     if mostrar_burbujas:
@@ -1155,6 +1339,35 @@ else:
         )
 
         st.markdown("---")
+
+# =====================================================
+# TABLA DE ALERTAS DE INSUMOS CRÍTICOS
+# =====================================================
+if not df_alertas.empty:
+    st.markdown("## Detalle alertas insumos críticos")
+
+    df_alertas_show = df_alertas.copy()
+    df_alertas_show["Fecha"] = df_alertas_show["Fecha"].dt.strftime("%d-%m-%Y")
+
+    columnas_alertas = [
+        "Fecha",
+        "Turno",
+        "Operador",
+        "Válvula",
+        "Mantención",
+        "Detalle alerta insumo crítico",
+        "Observaciones"
+    ]
+
+    columnas_alertas = [c for c in columnas_alertas if c in df_alertas_show.columns]
+
+    st.dataframe(
+        df_alertas_show[columnas_alertas],
+        use_container_width=True,
+        height=260
+    )
+
+    st.markdown("---")
 
 # =====================================================
 # DATOS DETALLADOS
@@ -1204,12 +1417,19 @@ else:
     fmt_min = "Sin datos"
     fmt_max = "Sin datos"
 
+total_alertas_fuente = (
+    int((df["Alerta insumos críticos"] == "Sí").sum())
+    if "Alerta insumos críticos" in df.columns and not df.empty
+    else 0
+)
+
 st.sidebar.info(
     f"Google Sheets\n\n"
     f"- {len(df):,} registros totales\n"
+    f"- Alertas insumos críticos: {total_alertas_fuente}\n"
     f"- Período: {fmt_min} → {fmt_max}\n"
     f"- Línea: 11\n"
-    f"- Válvulas monitoreadas: 152"
+    f"- Válvulas monitoreadas: 154"
 )
 
 # =====================================================
@@ -1220,6 +1440,7 @@ st.markdown(
     f"""
     <div style='text-align:center; opacity:0.6; font-size:0.8rem;'>
         Dashboard conectado a Google Sheets · Streamlit + Plotly · Línea 11 ·
+        Válvulas monitoreadas: 154 ·
         {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}
     </div>
     """,
