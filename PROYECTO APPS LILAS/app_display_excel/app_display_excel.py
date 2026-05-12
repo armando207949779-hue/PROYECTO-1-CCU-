@@ -1327,22 +1327,6 @@ if archivo is not None:
 
                     st.divider()
 
-                    st.subheader("Comparación por columna")
-
-                    for columna in df_ids_seleccionados.columns:
-                        with st.expander(f"Columna: {columna}", expanded=True):
-                            tabla_columna = tabla_valores_originales(
-                                df_ids_seleccionados,
-                                columna
-                            )
-
-                            st.dataframe(
-                                tabla_columna,
-                                use_container_width=True
-                            )
-
-                    st.divider()
-
                     st.subheader("Completar información final del ID agrupado")
 
                     st.write(
@@ -1380,7 +1364,7 @@ if archivo is not None:
                     for columna in columnas_editables:
                         st.markdown(f"### {columna}")
 
-                        with st.expander(f"Ver valores originales de {columna}", expanded=False):
+                        with st.expander(f"Ver valores originales de {columna}", expanded=True):
                             tabla_columna = tabla_valores_originales_simple(
                                 df_ids_seleccionados,
                                 columna
