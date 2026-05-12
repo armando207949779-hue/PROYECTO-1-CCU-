@@ -1344,10 +1344,12 @@ if archivo is not None:
                         for id_valor in ids_seleccionados
                     ])
 
+                    id_estandar_sugerido = f"ID_{ids_unidos}"
+
                     valores_finales["Id Estándar"] = st.text_input(
                         "Id Estándar final",
-                        value=f"ID_{ids_unidos}",
-                        key="final_id_estandar"
+                        value=id_estandar_sugerido,
+                        key=f"final_id_estandar_{ids_unidos}"
                     )
 
                     valores_finales["Maquina"] = st.text_input(
