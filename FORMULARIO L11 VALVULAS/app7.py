@@ -224,13 +224,38 @@ st.markdown(
         margin-top: 6px;
     }
 
-    .alerta-insumos {
-        background-color: rgba(255, 193, 7, 0.16);
-        color: #8A6D00;
-        border-radius: 8px;
-        padding: 12px 16px;
-        margin-top: 12px;
+    .alerta-card-title {
+        color: #0E4C92;
+        font-size: 1.35rem;
+        font-weight: 800;
+        margin-bottom: 4px;
+    }
+
+    .alerta-card-subtitle {
+        color: #5D6D7E;
         font-size: 0.95rem;
+        margin-bottom: 14px;
+    }
+
+    .alerta-box {
+        background: linear-gradient(90deg, rgba(255, 193, 7, 0.18), rgba(255, 248, 220, 0.65));
+        border-left: 5px solid #F4B400;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-top: 12px;
+        margin-bottom: 10px;
+    }
+
+    .alerta-box-title {
+        color: #8A6D00;
+        font-size: 0.98rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .alerta-box-text {
+        color: #6E5A00;
+        font-size: 0.9rem;
     }
     </style>
     """,
@@ -341,9 +366,26 @@ with st.container(border=True):
 # ALERTA INSUMOS CRÍTICOS
 # =====================================================
 with st.container(border=True):
-    st.subheader("Alerta insumos críticos")
+    st.markdown(
+        """
+        <div class="alerta-card-title">
+            Alerta insumos críticos
+        </div>
+        <div class="alerta-card-subtitle">
+            Marque si existe algún insumo crítico faltante para completar la mantención.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    col_si, col_no = st.columns(2)
+    # Valor inicial por defecto: NO
+    if "alerta_insumos_si" not in st.session_state:
+        st.session_state["alerta_insumos_si"] = False
+
+    if "alerta_insumos_no" not in st.session_state:
+        st.session_state["alerta_insumos_no"] = True
+
+    col_si, col_no, col_espacio = st.columns([1, 1, 4])
 
     with col_si:
         alerta_si = st.checkbox("Sí", key="alerta_insumos_si")
@@ -362,8 +404,13 @@ with st.container(border=True):
     if alerta_si and not alerta_no:
         st.markdown(
             """
-            <div class="alerta-insumos">
-                Indique cuál es el insumo crítico faltante o la alerta detectada.
+            <div class="alerta-box">
+                <div class="alerta-box-title">
+                    Detalle de alerta
+                </div>
+                <div class="alerta-box-text">
+                    Indique cuál es el insumo crítico faltante o la alerta detectada.
+                </div>
             </div>
             """,
             unsafe_allow_html=True
@@ -371,8 +418,9 @@ with st.container(border=True):
 
         detalle_alerta_insumo = st.text_area(
             "Detalle alerta insumo crítico",
-            height=100,
-            placeholder="Ejemplo: Falta stock de O-RINGS, resorte específico, bloque, kit de reparación, etc."
+            height=90,
+            placeholder="Ejemplo: Falta stock de O-RINGS, resorte específico, bloque, kit de reparación, etc.",
+            label_visibility="collapsed"
         ).upper().strip()
 
 
@@ -442,7 +490,10 @@ with st.container(border=True):
         st.write("Observaciones:", observaciones)
 
     if alerta_insumos_criticos == "Sí":
-        st.write("Detalle alerta insumo crítico:", detalle_alerta_insumo if detalle_alerta_insumo else "-")
+        st.write(
+            "Detalle alerta insumo crítico:",
+            detalle_alerta_insumo if detalle_alerta_insumo else "-"
+        )
 
     guardar = st.button("Guardar registro", use_container_width=True)
 
