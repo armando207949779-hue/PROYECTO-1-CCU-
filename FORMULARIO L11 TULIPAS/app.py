@@ -1,4 +1,4 @@
-# App Streamlit Formulario Válvulas Línea 11 - MATRIZ POR FORMATO
+# App Streamlit Formulario Tulipas Línea 11 - MATRIZ POR FORMATO
 # Versión homologada con Tulipas Línea 2, con logo CCU y formato actualizado
 
 import streamlit as st
@@ -13,7 +13,7 @@ import base64
 # CONFIGURACIÓN GENERAL
 # =====================================================
 st.set_page_config(
-    page_title="Formulario Mantenimiento Válvulas Línea 11",
+    page_title="Formulario Mantenimiento Tulipas Línea 11",
     page_icon="🏢",
     layout="centered"
 )
@@ -60,12 +60,12 @@ CABEZALES_POR_FORMATO = {
     "1250 CC": list(range(1, 10))     # C1 a C9
 }
 
-VALVULAS = list(range(1, 155))        # V1 a V154
+TULIPAS = list(range(1, 31))
 
 MANTENCIONES = [
     "",
-    "CAMBIO DE GOMA VÁLVULA",
-    "CAMBIO CUERPO VÁLVULA PLÁSTICA",
+    "CAMBIO DE GOMA TULIPA",
+    "CAMBIO CUERPO TULIPA PLÁSTICA",
     "CAMBIO DE RESORTE",
     "CAMBIO DE VÁSTAGO",
     "CAMBIO DE SEGURO DE VÁSTAGO",
@@ -101,18 +101,17 @@ def init_sheet(ws):
         "Equipo",
         "Formato",
         "Cabezal",
-        "Válvula",
+        "Tulipa",
         "Mantención",
         "Comentarios",
-        "Alerta insumos críticos",
         "Fecha registro"
     ]
 
     try:
         if ws.row_values(1) != headers:
-            ws.update("A1:K1", [headers])
+            ws.update("A1:J1", [headers])
     except Exception:
-        ws.update("A1:K1", [headers])
+        ws.update("A1:J1", [headers])
 
 
 def guardar_registros(filas):
@@ -221,27 +220,18 @@ st.markdown(
         margin-bottom: 0px;
     }
 
-    .matriz-valvulas {
+    .matriz-tulipas {
         padding-left: 10px;
         padding-right: 10px;
         margin-top: 6px;
     }
 
-    .valvulas-resumen {
+    .tulipas-resumen {
         background-color: rgba(30, 144, 255, 0.14);
         color: #1E90FF;
         border-radius: 8px;
         padding: 12px 16px;
         margin: 12px 10px 4px 10px;
-        font-size: 0.95rem;
-    }
-
-    .alerta-insumos {
-        background-color: rgba(255, 193, 7, 0.16);
-        color: #8A6D00;
-        border-radius: 8px;
-        padding: 12px 16px;
-        margin-top: 12px;
         font-size: 0.95rem;
     }
     </style>
@@ -284,10 +274,10 @@ st.markdown(
             FORMULARIO DE MANTENIMIENTO
         </h1>
         <h2>
-            LÍNEA 11 · VÁLVULAS
+            LÍNEA 11 · TULIPAS
         </h2>
         <p>
-            Registro de mantenciones por formato, cabezal y válvula
+            Registro de mantenciones por formato, cabezal y tulipa
         </p>
         <hr>
     </div>
@@ -326,12 +316,12 @@ with st.container(border=True):
 
 
 # =====================================================
-# SELECCIÓN DE VÁLVULAS
+# SELECCIÓN DE TULIPAS
 # =====================================================
 with st.container(border=True):
-    st.subheader("Selección de válvulas")
+    st.subheader("Selección de tulipas")
 
-    seleccion_valvulas = []
+    seleccion_tulipas = []
 
     if formato == "":
         st.warning("Seleccione primero el formato para desplegar la matriz.")
@@ -341,12 +331,12 @@ with st.container(border=True):
         st.caption(
             f"Formato seleccionado: {formato} | "
             f"Cabezales disponibles: C1 a C{max(cabezales)} | "
-            f"Válvulas disponibles: V1 a V154"
+            f"Tulipas disponibles: T1 a T30"
         )
 
         st.markdown(
             """
-            <div class="matriz-valvulas">
+            <div class="matriz-tulipas">
             """,
             unsafe_allow_html=True
         )
@@ -354,21 +344,21 @@ with st.container(border=True):
         header = st.columns(len(cabezales) + 1, gap="small")
 
         with header[0]:
-            st.markdown("**Válvula**")
+            st.markdown("**Tulipa**")
 
         for idx, c in enumerate(cabezales, start=1):
             with header[idx]:
                 st.markdown(f"**C{c}**")
 
-        for v in VALVULAS:
+        for t in TULIPAS:
             cols = st.columns(len(cabezales) + 1, gap="small")
 
             with cols[0]:
-                st.markdown(f"**V{v}**")
+                st.markdown(f"**T{t}**")
 
             for idx, c in enumerate(cabezales, start=1):
                 with cols[idx]:
-                    key = f"formato_{formato}_cabezal_{c}_valvula_{v}"
+                    key = f"formato_{formato}_cabezal_{c}_tulipa_{t}"
 
                     seleccionado = st.checkbox(
                         label="",
@@ -377,24 +367,24 @@ with st.container(border=True):
                     )
 
                     if seleccionado:
-                        seleccion_valvulas.append({
+                        seleccion_tulipas.append({
                             "Cabezal": c,
-                            "Válvula": v
+                            "Tulipa": t
                         })
 
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown(
             f"""
-            <div class="valvulas-resumen">
-                Válvulas seleccionadas: {len(seleccion_valvulas)}
+            <div class="tulipas-resumen">
+                Tulipas seleccionadas: {len(seleccion_tulipas)}
             </div>
             """,
             unsafe_allow_html=True
         )
 
-        if seleccion_valvulas:
-            st.write(seleccion_valvulas)
+        if seleccion_tulipas:
+            st.write(seleccion_tulipas)
 
 
 # =====================================================
@@ -421,21 +411,6 @@ with st.container(border=True):
         placeholder="Escriba observaciones adicionales..."
     )
 
-    alerta_insumos_criticos = st.checkbox(
-        "Alerta insumos críticos",
-        help="Marcar cuando falte algún insumo crítico para realizar o completar la mantención."
-    )
-
-    if alerta_insumos_criticos:
-        st.markdown(
-            """
-            <div class="alerta-insumos">
-                Se marcará este registro con alerta por falta de insumos críticos.
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
 
 # =====================================================
 # RESUMEN
@@ -449,11 +424,7 @@ with st.container(border=True):
     st.write("Equipo:", equipo)
     st.write("Formato:", formato)
     st.write("Mantención:", mantencion_final)
-    st.write("Válvulas seleccionadas:", seleccion_valvulas if seleccion_valvulas else "-")
-    st.write(
-        "Alerta insumos críticos:",
-        "Sí" if alerta_insumos_criticos else "No"
-    )
+    st.write("Tulipas seleccionadas:", seleccion_tulipas if seleccion_tulipas else "-")
 
     guardar = st.button("Guardar registro", use_container_width=True)
 
@@ -480,8 +451,8 @@ if guardar:
     if not formato:
         errores.append("Seleccionar formato")
 
-    if not seleccion_valvulas:
-        errores.append("Seleccionar al menos una válvula")
+    if not seleccion_tulipas:
+        errores.append("Seleccionar al menos una tulipa")
 
     if not mantencion_sel:
         errores.append("Seleccionar mantención")
@@ -497,7 +468,7 @@ if guardar:
         filas = []
         fecha_registro = obtener_hora_chile()
 
-        for item in seleccion_valvulas:
+        for item in seleccion_tulipas:
             filas.append([
                 fecha.strftime("%d-%m-%Y"),
                 turno,
@@ -505,10 +476,9 @@ if guardar:
                 equipo,
                 formato,
                 item["Cabezal"],
-                item["Válvula"],
+                item["Tulipa"],
                 mantencion_final,
                 comentario,
-                "Sí" if alerta_insumos_criticos else "No",
                 fecha_registro
             ])
 
@@ -527,7 +497,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Válvulas Línea 11</b> · v4.0<br>
+        <b>Formulario Mantenimiento Tulipas Línea 11</b> · v3.1<br>
         Streamlit · Google Sheets
     </div>
     """,
