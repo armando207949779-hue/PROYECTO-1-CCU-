@@ -321,10 +321,19 @@ with st.container(border=True):
 with st.container(border=True):
     st.subheader("Selección de tulipas")
 
+    omitir_tulipas = st.checkbox(
+        "Omitir selección de cabezal y tulipa",
+        help="Marcar cuando la mantención no aplica a un cabezal o tulipa específica."
+    )
+
     seleccion_tulipas = []
 
-    if formato == "":
+    if omitir_tulipas:
+        st.info("Selección de cabezal y tulipa omitida para esta mantención.")
+
+    elif formato == "":
         st.warning("Seleccione primero el formato para desplegar la matriz.")
+
     else:
         cabezales = CABEZALES_POR_FORMATO[formato]
 
@@ -424,7 +433,11 @@ with st.container(border=True):
     st.write("Equipo:", equipo)
     st.write("Formato:", formato)
     st.write("Mantención:", mantencion_final)
-    st.write("Tulipas seleccionadas:", seleccion_tulipas if seleccion_tulipas else "-")
+
+    st.write(
+        "Tulipas seleccionadas:",
+        "NO APLICA" if omitir_tulipas else seleccion_tulipas if seleccion_tulipas else "-"
+    )
 
     guardar = st.button("Guardar registro", use_container_width=True)
 
@@ -451,8 +464,8 @@ if guardar:
     if not formato:
         errores.append("Seleccionar formato")
 
-    if not seleccion_tulipas:
-        errores.append("Seleccionar al menos una tulipa")
+    if not omitir_tulipas and not seleccion_tulipas:
+        errores.append("Seleccionar al menos una tulipa o marcar omisión")
 
     if not mantencion_sel:
         errores.append("Seleccionar mantención")
@@ -468,19 +481,33 @@ if guardar:
         filas = []
         fecha_registro = obtener_hora_chile()
 
-        for item in seleccion_tulipas:
+        if omitir_tulipas:
             filas.append([
                 fecha.strftime("%d-%m-%Y"),
                 turno,
                 operador_final,
                 equipo,
                 formato,
-                item["Cabezal"],
-                item["Tulipa"],
+                "NO APLICA",
+                "NO APLICA",
                 mantencion_final,
                 comentario,
                 fecha_registro
             ])
+        else:
+            for item in seleccion_tulipas:
+                filas.append([
+                    fecha.strftime("%d-%m-%Y"),
+                    turno,
+                    operador_final,
+                    equipo,
+                    formato,
+                    item["Cabezal"],
+                    item["Tulipa"],
+                    mantencion_final,
+                    comentario,
+                    fecha_registro
+                ])
 
         try:
             guardar_registros(filas)
@@ -497,7 +524,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Tulipas Línea 11</b> · v3.1<br>
+        <b>Formulario Mantenimiento Tulipas Línea 11</b> · v3.2<br>
         Streamlit · Google Sheets
     </div>
     """,
