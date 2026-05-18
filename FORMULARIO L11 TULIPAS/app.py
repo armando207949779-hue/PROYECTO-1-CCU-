@@ -46,6 +46,7 @@ OPERADORES = [
     "JORGE MUÑOZ",
     "LUIS SOTO",
     "ISMAEL BRIONES",
+    "MIGUEL ZEGARRA ROJAS",
     "OTRO"
 ]
 
@@ -524,7 +525,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Tulipas Línea 11</b> · v3.3<br>
+        <b>Formulario Mantenimiento Tulipas Línea 11</b> · v3.4<br>
         Streamlit · Google Sheets
     </div>
     """,
