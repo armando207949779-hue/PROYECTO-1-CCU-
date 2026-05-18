@@ -316,6 +316,31 @@ with st.container(border=True):
 
 
 # =====================================================
+# MANTENCIÓN
+# =====================================================
+with st.container(border=True):
+    st.subheader("Mantención")
+
+    mantencion_sel = st.selectbox("Tipo de mantención", MANTENCIONES)
+
+    mantencion_manual = ""
+
+    if mantencion_sel == "OTRO":
+        mantencion_manual = st.text_input(
+            "Especificar mantención",
+            placeholder="Ingrese tipo de mantención"
+        ).upper().strip()
+
+    mantencion_final = mantencion_manual if mantencion_sel == "OTRO" else mantencion_sel
+
+    comentario = st.text_area(
+        "Comentarios",
+        height=120,
+        placeholder="Escriba observaciones adicionales..."
+    )
+
+
+# =====================================================
 # SELECCIÓN DE TULIPAS
 # =====================================================
 with st.container(border=True):
@@ -397,31 +422,6 @@ with st.container(border=True):
 
 
 # =====================================================
-# MANTENCIÓN
-# =====================================================
-with st.container(border=True):
-    st.subheader("Mantención")
-
-    mantencion_sel = st.selectbox("Tipo de mantención", MANTENCIONES)
-
-    mantencion_manual = ""
-
-    if mantencion_sel == "OTRO":
-        mantencion_manual = st.text_input(
-            "Especificar mantención",
-            placeholder="Ingrese tipo de mantención"
-        ).upper().strip()
-
-    mantencion_final = mantencion_manual if mantencion_sel == "OTRO" else mantencion_sel
-
-    comentario = st.text_area(
-        "Comentarios",
-        height=120,
-        placeholder="Escriba observaciones adicionales..."
-    )
-
-
-# =====================================================
 # RESUMEN
 # =====================================================
 with st.container(border=True):
@@ -464,14 +464,14 @@ if guardar:
     if not formato:
         errores.append("Seleccionar formato")
 
-    if not omitir_tulipas and not seleccion_tulipas:
-        errores.append("Seleccionar al menos una tulipa o marcar omisión")
-
     if not mantencion_sel:
         errores.append("Seleccionar mantención")
 
     if mantencion_sel == "OTRO" and not mantencion_manual:
         errores.append("Especificar mantención")
+
+    if not omitir_tulipas and not seleccion_tulipas:
+        errores.append("Seleccionar al menos una tulipa o marcar omisión")
 
     if errores:
         for error in errores:
@@ -524,7 +524,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; opacity: 0.6; font-size: 0.85rem;'>
-        <b>Formulario Mantenimiento Tulipas Línea 11</b> · v3.2<br>
+        <b>Formulario Mantenimiento Tulipas Línea 11</b> · v3.3<br>
         Streamlit · Google Sheets
     </div>
     """,
